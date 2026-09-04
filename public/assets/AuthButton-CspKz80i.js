@@ -1,0 +1,1 @@
+import{a as e}from"./request-DYLKlgp1.js";import{Mr as t,t as n}from"./jsx-runtime-DWisiZ1Q.js";import{t as r}from"./user-CM8p27DJ.js";var i=e(t(),1),a=n(),o=({auth:e,children:t})=>{let n=r(e=>e.access);return(0,i.useMemo)(()=>!e||n.includes(e),[n,e])?(0,a.jsx)(a.Fragment,{children:t}):null};export{o as t};

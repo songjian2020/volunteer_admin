@@ -1,0 +1,169 @@
+import type {
+  TableProps,
+  TableColumnType,
+  CardProps,
+  FormInstance,
+  PaginationProps,
+} from 'antd';
+import type {ReactNode, RefObject, Dispatch, SetStateAction} from 'react';
+import type { FormColumn } from '@/components/XinFormField/FieldRender/typings';
+import type { SearchFormProps } from './SearchForm';
+import type {XinFormProps, XinFormRef} from '@/components/XinForm/typings';
+
+/**
+ * 表单模式
+ */
+export type FormMode = 'create' | 'update';
+
+/**
+ * 表格列配置
+ */
+export type XinTableColumn<T = any> = Omit<TableColumnType<T>, 'dataIndex'> & {
+  hideInSearch?: boolean;
+  hideInForm?: boolean;
+  hideInTable?: boolean;
+  hideInUpdate?: boolean;
+  hideInCreate?: boolean;
+  search?: FormColumn<T>;
+} & FormColumn<T>;
+
+/**
+ * 表格操作栏按钮
+ */
+export type OperateNode = {
+  /** 删除按钮 */
+  del: ReactNode;
+  /** 编辑按钮 */
+  edit: ReactNode;
+}
+
+/**
+ * 顶部操作按钮渲染
+ */
+export type ActionNode = {
+  /** 新增按钮 */
+  add: ReactNode;
+  /** 搜索按钮 */
+  search: ReactNode;
+  /** 关键字搜索框 */
+  keywordSearch: ReactNode;
+}
+
+/**
+ * 顶部右侧工具栏渲染
+ */
+export type ToolBarNode = {
+  /** 刷新按钮 */
+  reload: ReactNode;
+  /** 密度设置按钮 */
+  columnHeight: ReactNode;
+  /** 边框设置按钮 */
+  hideBorder: ReactNode;
+  /** 列设置按钮 */
+  columnSetting: ReactNode;
+}
+
+/**
+ * XinTable 实例
+ */
+export interface XinTableInstance<T = any> {
+  /** 刷新表格（保持当前页） */
+  reload: (resetPage?: boolean) => Promise<void>;
+  /** 重置表格到第一页并刷新 */
+  reset: () => Promise<void>;
+  /** 获取当前数据源 */
+  getDataSource: () => T[];
+  /** 设置数据源 */
+  setDataSource: Dispatch<SetStateAction<T[]>>;
+  /** 获取数据总数 */
+  getTotal: () => number;
+  /** 获取加载状态 */
+  getLoading: () => boolean;
+  /** 设置加载状态 */
+  setLoading: Dispatch<SetStateAction<boolean>>;
+  /** 设置分页参数 */
+  setPageInfo: (page?: number, pageSize?: number) => void;
+  /** 获取表单实例 */
+  getForm: () => XinFormRef<T> | null | undefined;
+  /** 获取搜索表单实例 */
+  getSearchForm: () => FormInstance<T> | undefined;
+}
+
+export interface SorterParams {
+  field: string;
+  order: 'asc' | 'desc';
+}
+
+/** 请求参数类型 */
+export interface RequestParams extends Record<string, any> {
+  page?: number;
+  pageSize?: number;
+  filter?: Record<string, any>;
+  sorter?: SorterParams;
+  keywordSearch?: string;
+}
+
+/**
+ * XinTable 组件属性
+ */
+export interface XinTableProps<T = any> extends Omit<TableProps<T>, 'columns' | 'rowKey' | 'onChange' | 'pagination'> {
+  /** API 地址 */
+  api: string;
+  /** 权限名称前缀 */
+  accessName: string;
+  /** 主键 */
+  rowKey: string;
+  /** 列配置 */
+  columns: XinTableColumn<T>[];
+
+  /** 表格 ref */
+  tableRef?: RefObject<XinTableInstance<T> | null>;
+
+  /** 新增按钮显示 */
+  addShow?: boolean;
+  /** 编辑按钮显示 */
+  editShow?: boolean | ((record: T) => boolean);
+  /** 删除按钮显示 */
+  deleteShow?: boolean | ((record: T) => boolean);
+  /** 搜索栏显示 */
+  searchShow?: boolean;
+  /** 表格操作列显示 */
+  operateShow?: boolean;
+  /** 分页显示 */
+  paginationShow?: boolean;
+  /** 快速搜索显示 */
+  keywordSearchShow?: boolean;
+
+  /** 表单属性  */
+  formProps?: Omit<XinFormProps<T>, 'onFinish' | 'modalProps' | 'drawerProps' | 'columns' | 'formRef' | 'layoutType'> | false;
+  /** 表单布局：弹窗或抽屉 */
+  formLayoutType?: 'ModalForm' | 'DrawerForm';
+  /** 新增表单初始值（支持异步，如自动计算排序） */
+  createInitialValues?: Partial<T> | (() => Partial<T> | Promise<Partial<T>>);
+  /** 表单属性  */
+  modalProps?: XinFormProps<T>['modalProps'];
+  /** 抽屉属性（formLayoutType 为 DrawerForm 时生效） */
+  drawerProps?: XinFormProps<T>['drawerProps'];
+  /** 搜索栏属性  */
+  searchProps?: Omit<SearchFormProps<T>, 'form'> | false;
+  /** 操作栏属性 */
+  operateProps?: TableColumnType<T>;
+  /** 卡片属性 */
+  cardProps?: Pick<CardProps, 'variant' | 'hoverable' | 'size' | 'classNames' | 'styles'>;
+  /** 分页配置 */
+  pagination?: Omit<PaginationProps, 'total' | 'onChange' | 'current'>;
+
+  /** 顶部操作栏渲染 */
+  actionBarRender?: ((dom: ActionNode) => ReactNode[]);
+  /** 工具栏渲染 */
+  toolBarRender?: ((dom: ToolBarNode) => ReactNode[]);
+  /** 表格操作栏渲染 */
+  operateRender?: ((record: T, dom: OperateNode) => ReactNode[]);
+
+  /** 自定义请求 */
+  handleRequest?: (params: RequestParams) => Promise<{ data: T[]; total: number }>;
+  /** 请求参数处理 */
+  requestParams?: (params: RequestParams) => RequestParams;
+  /** 自定义表单请求 */
+  handleFinish?: (values: T, mode: FormMode, formRef: RefObject<XinFormRef<T> | null>, defaultValue?: T) => Promise<boolean>;
+}
