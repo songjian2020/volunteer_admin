@@ -41,6 +41,7 @@ class VolunteerSeeder extends Seeder
                     ['type' => 'route', 'key' => 'volunteer.volunteer.pending', 'name' => '志愿者审�?, 'path' => '/volunteer/volunteer/pending', 'local' => 'menu.volunteer.volunteer.pending'],
                     ['type' => 'route', 'key' => 'volunteer.volunteer', 'name' => '志愿者管�?, 'path' => '/volunteer/volunteer', 'local' => 'menu.volunteer.volunteer', 'children' => [
                         ['type' => 'rule', 'name' => '查询', 'key' => 'volunteer.volunteer.query'],
+                        ['type' => 'rule', 'name' => '新增', 'key' => 'volunteer.volunteer.create'],
                         ['type' => 'rule', 'name' => '审核', 'key' => 'volunteer.volunteer.audit'],
                         ['type' => 'rule', 'name' => '调整积分', 'key' => 'volunteer.volunteer.points'],
                         ['type' => 'rule', 'name' => '删除', 'key' => 'volunteer.volunteer.delete'],

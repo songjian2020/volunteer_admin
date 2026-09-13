@@ -11,6 +11,7 @@ use Modules\AnnoRoute\Attribute\PutRoute;
 use Modules\AnnoRoute\Attribute\RequestAttribute;
 use Modules\Common\Http\Controllers\BaseController;
 use Modules\Volunteer\Models\VolVolunteerModel;
+use Modules\Volunteer\Models\VolWxUserModel;
 use Modules\Volunteer\Services\PointsService;
 
 #[RequestAttribute('/volunteer/volunteer', 'volunteer.volunteer')]
@@ -28,6 +29,58 @@ class VolunteerManageController extends BaseController
             ->paginate($pageSize)
             ->toArray();
         return $this->success($data);
+    }
+
+    /** 后台手动新增已通过志愿者 */
+    #[PostRoute(authorize: 'create')]
+    public function create(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:30',
+            'phone' => 'required|string|max:20',
+            'gender' => 'nullable|string|max:2',
+            'age' => 'nullable|integer|min:0|max:120',
+            'education' => 'nullable|string|max:30',
+            'political_status' => 'nullable|string|max:30',
+            'id_card' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:200',
+            'specialty' => 'nullable|string|max:200',
+            'emergency_contact' => 'nullable|string|max:30',
+            'emergency_phone' => 'nullable|string|max:20',
+            'wx_user_id' => 'nullable|integer|min:1',
+        ]);
+
+        if (VolVolunteerModel::where('phone', $data['phone'])->exists()) {
+            return $this->error('该手机号已存在志愿者档案');
+        }
+
+        $wxUserId = !empty($data['wx_user_id']) ? (int) $data['wx_user_id'] : null;
+        unset($data['wx_user_id']);
+        if ($wxUserId) {
+            if (!VolWxUserModel::where('id', $wxUserId)->exists()) {
+                return $this->error('绑定的微信用户不存在');
+            }
+            if (VolVolunteerModel::where('wx_user_id', $wxUserId)->exists()) {
+                return $this->error('该微信用户已绑定志愿者');
+            }
+        }
+
+        $model = VolVolunteerModel::create([
+            ...$data,
+            'wx_user_id' => $wxUserId,
+            'gender' => $data['gender'] ?? '1',
+            'age' => $data['age'] ?? 0,
+            'audit_status' => 1,
+            'total_points' => 0,
+            'total_hours' => 0,
+            'activity_count' => 0,
+            'star_level' => 0,
+        ]);
+        $model->update([
+            'certificate_no' => str_pad((string) $model->id, 4, '0', STR_PAD_LEFT),
+        ]);
+
+        return $this->success(['id' => $model->id], '新增成功');
     }
 
     /** 审批通过/拒绝（PUT/POST 均可，审批页与列表页共用） */

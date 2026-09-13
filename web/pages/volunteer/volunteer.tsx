@@ -10,6 +10,15 @@ interface IVolunteer {
   id: number;
   name: string;
   phone: string;
+  gender?: string;
+  age?: number;
+  education?: string;
+  political_status?: string;
+  id_card?: string;
+  address?: string;
+  specialty?: string;
+  emergency_contact?: string;
+  emergency_phone?: string;
   audit_status: number;
   total_points: number;
   total_hours: number;
@@ -17,19 +26,115 @@ interface IVolunteer {
   star_level: number;
 }
 
+const genderOptions = [
+  {label: '男', value: '1'},
+  {label: '女', value: '2'},
+];
+
 export default function VolunteerPage() {
   const tableRef = useRef<XinTableInstance<IVolunteer>>(null);
 
   const columns: XinTableColumn<IVolunteer>[] = [
     {title: 'ID', dataIndex: 'id', width: 70, hideInForm: true},
-    {title: '姓名', dataIndex: 'name'},
-    {title: '电话', dataIndex: 'phone'},
-    {title: '累计积分', dataIndex: 'total_points'},
-    {title: '服务时长', dataIndex: 'total_hours'},
-    {title: '活动数', dataIndex: 'activity_count'},
-    {title: '星级', dataIndex: 'star_level'},
-    {title: '状态', dataIndex: 'audit_status', hideInSearch: true,
-      render: () => <Badge status="success" text="已通过"/>},
+    {
+      title: '姓名',
+      dataIndex: 'name',
+      valueType: 'text',
+      rules: [{required: true, message: '请输入姓名'}],
+      colProps: {span: 12},
+    },
+    {
+      title: '电话',
+      dataIndex: 'phone',
+      valueType: 'text',
+      rules: [{required: true, message: '请输入电话'}],
+      colProps: {span: 12},
+    },
+    {
+      title: '性别',
+      dataIndex: 'gender',
+      valueType: 'select',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 12},
+      fieldProps: {options: genderOptions, placeholder: '请选择性别', allowClear: true},
+    },
+    {
+      title: '年龄',
+      dataIndex: 'age',
+      valueType: 'digit',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 12},
+      fieldProps: {min: 0, max: 120, style: {width: '100%'}},
+    },
+    {
+      title: '文化程度',
+      dataIndex: 'education',
+      valueType: 'text',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 12},
+    },
+    {
+      title: '政治面貌',
+      dataIndex: 'political_status',
+      valueType: 'text',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 12},
+    },
+    {
+      title: '身份证号',
+      dataIndex: 'id_card',
+      valueType: 'text',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 12},
+    },
+    {
+      title: '家庭住址',
+      dataIndex: 'address',
+      valueType: 'text',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 12},
+    },
+    {
+      title: '特长',
+      dataIndex: 'specialty',
+      valueType: 'text',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 24},
+    },
+    {
+      title: '紧急联系人',
+      dataIndex: 'emergency_contact',
+      valueType: 'text',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 12},
+    },
+    {
+      title: '紧急联系电话',
+      dataIndex: 'emergency_phone',
+      valueType: 'text',
+      hideInTable: true,
+      hideInSearch: true,
+      colProps: {span: 12},
+    },
+    {title: '累计积分', dataIndex: 'total_points', hideInForm: true},
+    {title: '服务时长', dataIndex: 'total_hours', hideInForm: true},
+    {title: '活动数', dataIndex: 'activity_count', hideInForm: true},
+    {title: '星级', dataIndex: 'star_level', hideInForm: true},
+    {
+      title: '状态',
+      dataIndex: 'audit_status',
+      hideInSearch: true,
+      hideInForm: true,
+      render: () => <Badge status="success" text="已通过"/>,
+    },
   ];
 
   const handleAdjustPoints = (record: IVolunteer) => {
@@ -69,8 +174,12 @@ export default function VolunteerPage() {
         columns={columns}
         rowKey="id"
         accessName="volunteer.volunteer"
-        addShow={false}
+        addShow
         editShow={false}
+        formLayoutType="DrawerForm"
+        drawerProps={{width: 720}}
+        formProps={{grid: true, colProps: {span: 12}, layout: 'vertical'}}
+        createInitialValues={{gender: '1'}}
         operateWidth={120}
         requestParams={(params) => ({...params, audit_status: 1})}
         operateRender={(record, dom) => [

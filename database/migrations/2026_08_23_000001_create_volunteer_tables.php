@@ -22,7 +22,7 @@ return new class extends Migration
 
         Schema::create('vol_volunteer', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('wx_user_id')->unique()->comment('微信用户ID');
+            $table->unsignedBigInteger('wx_user_id')->nullable()->unique()->comment('微信用户ID，后台新增可为空');
             $table->string('name', 30)->default('')->comment('姓名');
             $table->string('phone', 20)->default('')->index()->comment('联系电话');
             $table->string('gender', 2)->default('1')->comment('性别 1男 2女');
