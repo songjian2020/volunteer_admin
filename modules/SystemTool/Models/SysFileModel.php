@@ -70,22 +70,22 @@ class SysFileModel extends Model
             get: function ($value, array $data) {
                 try {
                     // 图片类型：直接返回图片URL作为预览
-                    if ($data['file_type'] === FileType::IMAGE->value) {
-                        if($data['disk'] === 'local') {
-                            return Storage::disk($data['disk'])->url($data['file_path']);
+                    if ((int) ($data['file_type'] ?? 0) === FileType::IMAGE->value) {
+                        if (($data['disk'] ?? 'local') === 'local') {
+                            return public_storage_url((string) ($data['file_path'] ?? ''));
                         }
                         return Storage::disk($data['disk'])->temporaryUrl(
                             $data['file_path'], now()->plus(minutes: 5)
                         );
                     }
-                    $fileType = FileType::tryFrom($data['file_type']);
+                    $fileType = FileType::tryFrom((int) ($data['file_type'] ?? 0));
                     // 其他类型：返回默认类型图标
                     $previewPath = $fileType?->previewPath() ?? FileType::ANNEX->previewPath();
-                    return config('app.url') . '/' . $previewPath;
+                    return public_site_url($previewPath);
 
                 } catch (\Throwable $e) {
                     // 发生异常时返回默认图标
-                    return config('app.url') . '/' . FileType::ANNEX->previewPath();
+                    return public_site_url(FileType::ANNEX->previewPath());
                 }
             }
         );
@@ -99,9 +99,12 @@ class SysFileModel extends Model
         return new Attribute(
             get: function ($value, array $data) {
                 try {
+                    if (($data['disk'] ?? 'local') === 'local') {
+                        return public_storage_url((string) ($data['file_path'] ?? ''));
+                    }
                     return Storage::disk($data['disk'])->url($data['file_path']);
                 } catch (\Throwable $e) {
-                    return null;
+                    return public_storage_url((string) ($data['file_path'] ?? ''));
                 }
             }
         );

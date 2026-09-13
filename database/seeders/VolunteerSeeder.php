@@ -65,6 +65,9 @@ class VolunteerSeeder extends Seeder
                         ['type' => 'rule', 'name' => '编辑', 'key' => 'volunteer.merchant.update'],
                         ['type' => 'rule', 'name' => '删除', 'key' => 'volunteer.merchant.delete'],
                     ]],
+                    ['type' => 'route', 'key' => 'volunteer.verify', 'name' => '核销查询', 'path' => '/volunteer/verify', 'local' => 'menu.volunteer.verify', 'children' => [
+                        ['type' => 'rule', 'name' => '查询', 'key' => 'volunteer.verify.query'],
+                    ]],
                     ['type' => 'route', 'key' => 'volunteer.goods', 'name' => '商品管理', 'path' => '/volunteer/goods', 'local' => 'menu.volunteer.goods', 'children' => [
                         ['type' => 'rule', 'name' => '查询', 'key' => 'volunteer.goods.query'],
                         ['type' => 'rule', 'name' => '新增', 'key' => 'volunteer.goods.create'],

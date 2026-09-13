@@ -187,7 +187,11 @@ export default function GoodsPage() {
               size="small"
               type="link"
               onClick={() =>
-                createAxios.put(`/volunteer/goods/${record.id}/audit`, {status: 1}).then(() => {
+                createAxios({
+                  url: `/volunteer/goods/${record.id}/audit`,
+                  method: 'post',
+                  data: {status: 1},
+                }).then(() => {
                   window.$message?.success('已审核通过');
                   void tableRef.current?.reload();
                 })

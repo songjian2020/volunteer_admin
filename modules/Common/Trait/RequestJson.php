@@ -2,6 +2,7 @@
 namespace Modules\Common\Trait;
 
 use App\Exceptions\HttpResponseException;
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Http\JsonResponse;
 use Modules\Common\Enum\ShowType as ShopTypeEnum;
 
@@ -12,90 +13,118 @@ use Modules\Common\Enum\ShowType as ShopTypeEnum;
 trait RequestJson
 {
     /**
+     * 将 Model/Collection 等转为数组，避免被当成 msg 字符串
+     */
+    protected function normalizeResponseData(mixed $data): array|string
+    {
+        if ($data instanceof Arrayable) {
+            return $data->toArray();
+        }
+        if ($data instanceof \JsonSerializable) {
+            $serialized = $data->jsonSerialize();
+            return is_array($serialized) ? $serialized : ['value' => $serialized];
+        }
+        if (is_array($data)) {
+            return $data;
+        }
+        if (is_object($data)) {
+            $encoded = json_decode(json_encode($data, JSON_UNESCAPED_UNICODE), true);
+            return is_array($encoded) ? $encoded : [];
+        }
+        return (string) $data;
+    }
+
+    /**
      *  成功响应
      *
-     * @param  string|array  $data  响应数据
+     * @param  mixed  $data  响应数据（支持 array/Model/Collection/string）
      * @param  string  $message  响应内容
      */
-    protected function success(string|array $data = [], string $message = 'ok'): JsonResponse
+    protected function success(mixed $data = [], string $message = 'ok'): JsonResponse
     {
-        if (is_array($data)) {
-            return self::renderJson(true, $data, $message);
+        $payload = $this->normalizeResponseData($data);
+        if (is_array($payload)) {
+            return self::renderJson(true, $payload, $message);
         }
 
-        return self::renderJson(true, [], $data);
+        return self::renderJson(true, [], $payload);
     }
 
     /**
      * 抛出成功响应，中断程序运行
      *
-     * @param  string|array  $data  响应数据
+     * @param  mixed  $data  响应数据
      * @param  string  $message  响应内容
      */
-    protected function throwSuccess(string|array $data = [], string $message = 'ok'): void
+    protected function throwSuccess(mixed $data = [], string $message = 'ok'): void
     {
-        if (is_array($data)) {
-            self::renderThrow(true, $data, $message);
+        $payload = $this->normalizeResponseData($data);
+        if (is_array($payload)) {
+            self::renderThrow(true, $payload, $message);
         }
-        self::renderThrow(true, [], $data);
+        self::renderThrow(true, [], is_string($payload) ? $payload : 'ok');
     }
 
     /**
      *  返回失败响应
      *
-     * @param  string|array  $data  响应数据
+     * @param  mixed  $data  响应数据
      * @param  string  $message  响应内容
      */
-    protected function error(string|array $data = [], string $message = ''): JsonResponse
+    protected function error(mixed $data = [], string $message = ''): JsonResponse
     {
-        if (is_array($data)) {
-            return self::renderJson(false, $data, $message, ShopTypeEnum::ERROR_MESSAGE);
+        $payload = $this->normalizeResponseData($data);
+        if (is_array($payload)) {
+            return self::renderJson(false, $payload, $message, ShopTypeEnum::ERROR_MESSAGE);
         }
 
-        return self::renderJson(false, [], $data, ShopTypeEnum::ERROR_MESSAGE);
+        return self::renderJson(false, [], $payload, ShopTypeEnum::ERROR_MESSAGE);
     }
 
     /**
      * 抛出失败响应，中断程序运行
      *
-     * @param  string|array  $data  响应数据
+     * @param  mixed  $data  响应数据
      * @param  string  $message  响应内容
      */
-    protected function throwError(string|array $data = [], string $message = ''): void
+    protected function throwError(mixed $data = [], string $message = ''): void
     {
-        if (is_array($data)) {
-            self::renderThrow(false, $data, $message, ShopTypeEnum::ERROR_MESSAGE);
+        $payload = $this->normalizeResponseData($data);
+        if (is_array($payload)) {
+            self::renderThrow(false, $payload, $message, ShopTypeEnum::ERROR_MESSAGE);
         }
-        self::renderThrow(false, [], $data, ShopTypeEnum::ERROR_MESSAGE);
+        self::renderThrow(false, [], is_string($payload) ? $payload : '', ShopTypeEnum::ERROR_MESSAGE);
     }
 
     /**
      *  返回警告响应
      *
-     * @param  string|array  $data  响应数据
+     * @param  mixed  $data  响应数据
      * @param  string  $message  响应内容
      */
-    protected function warn(string|array $data = [], string $message = ''): JsonResponse
+    protected function warn(mixed $data = [], string $message = ''): JsonResponse
     {
-        if (is_array($data)) {
-            return self::renderJson(false, $data, $message, ShopTypeEnum::WARN_MESSAGE);
+        $payload = $this->normalizeResponseData($data);
+        if (is_array($payload)) {
+            return self::renderJson(false, $payload, $message, ShopTypeEnum::WARN_MESSAGE);
         }
 
-        return self::renderJson(false, [], $data, ShopTypeEnum::WARN_MESSAGE);
+        return self::renderJson(false, [], $payload, ShopTypeEnum::WARN_MESSAGE);
     }
 
     /**
      * 抛出失败警告，中断程序运行
      *
-     * @param  string|array  $data  响应数据
+     * @param  mixed  $data  响应数据
      * @param  string  $message  响应内容
      */
-    protected function throwWarn(string|array $data = [], string $message = ''): void
+    protected function throwWarn(mixed $data = [], string $message = ''): void
     {
-        if (is_array($data)) {
-            self::renderThrow(false, $data, $message, ShopTypeEnum::WARN_MESSAGE);
+        $payload = $this->normalizeResponseData($data);
+        if (is_array($payload)) {
+            self::renderThrow(false, $payload, $message, ShopTypeEnum::WARN_MESSAGE);
         }
-        self::renderThrow(false, [], $data, ShopTypeEnum::WARN_MESSAGE);
+        self::renderThrow(false, [], is_string($payload) ? $payload : '', ShopTypeEnum::WARN_MESSAGE);
     }
 
     /**

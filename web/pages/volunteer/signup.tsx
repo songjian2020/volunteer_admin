@@ -25,6 +25,7 @@ export default function SignupPage() {
     {title: 'ID', dataIndex: 'id', width: 70},
     {title: '活动', dataIndex: ['activity', 'title']},
     {title: '活动类型', dataIndex: ['activity', 'type'], hideInSearch: true},
+    {title: '用户昵称', dataIndex: ['volunteer', 'wx_user', 'nickname'], hideInSearch: true},
     {title: '志愿者', dataIndex: ['volunteer', 'name']},
     {title: '电话', dataIndex: ['volunteer', 'phone']},
     {title: '活动ID', dataIndex: 'activity_id', hideInTable: true},

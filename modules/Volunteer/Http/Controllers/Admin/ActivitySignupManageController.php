@@ -25,7 +25,8 @@ class ActivitySignupManageController extends BaseController
         $pageSize = $request->input('pageSize', 10);
         $data = $this->buildSearch($request->all(), VolActivitySignupModel::with([
             'activity:id,title,type,start_time',
-            'volunteer:id,name,phone',
+            'volunteer:id,wx_user_id,name,phone',
+            'volunteer.wxUser:id,nickname',
         ]))
             ->orderByDesc('id')
             ->paginate($pageSize)

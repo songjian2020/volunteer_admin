@@ -78,15 +78,20 @@ class MerchantManageController extends BaseController
         return $this->success();
     }
 
-    #[PutRoute(route: '/{id}/audit', authorize: 'audit', where: ['id' => '[0-9]+'])]
+    #[PutRoute(route: '/{id}/audit', authorize: 'query', where: ['id' => '[0-9]+'])]
+    #[PostRoute(route: '/{id}/audit', authorize: 'query', where: ['id' => '[0-9]+'])]
     public function audit(int $id, Request $request): JsonResponse
     {
         $model = VolMerchantModel::find($id);
         if (!$model) {
             return $this->error('商户不存在');
         }
-        $model->update(['audit_status' => (int) $request->input('audit_status', 1)]);
-        return $this->success();
+        $status = (int) $request->input('audit_status', 1);
+        if (!in_array($status, [1, 2], true)) {
+            return $this->error('无效的审核状态');
+        }
+        $model->update(['audit_status' => $status]);
+        return $this->success([], $status === 1 ? '已通过' : '已拒绝');
     }
 
     #[DeleteRoute(route: '/{id}', authorize: 'delete', where: ['id' => '[0-9]+'])]

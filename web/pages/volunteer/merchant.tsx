@@ -28,6 +28,8 @@ interface IMerchant {
   business_type: string;
   description?: string;
   full_address?: string;
+  total_points?: number;
+  total_verify_count?: number;
   audit_status: number;
   status: number;
 }
@@ -82,7 +84,7 @@ export default function MerchantPage() {
       width: 80,
       hideInSearch: true,
       colProps: {span: 24},
-      rules: [{required: true, message: '请上传商户Logo'}],
+      tooltip: '请上传商户Logo',
       fieldRender: () => <UrlImageUpload />,
       render: (_: unknown, record: IMerchant) =>
         record.logo
@@ -108,6 +110,22 @@ export default function MerchantPage() {
     },
     {title: '联系人', dataIndex: 'contact', valueType: 'text', colProps: {span: 12}, hideInSearch: true},
     {title: '电话', dataIndex: 'phone', valueType: 'text', colProps: {span: 12}, hideInSearch: true},
+    {
+      title: '商户积分',
+      dataIndex: 'total_points',
+      width: 100,
+      hideInForm: true,
+      hideInSearch: true,
+      render: (v: number) => <Text strong style={{color: '#1677ff'}}>{v ?? 0}</Text>,
+    },
+    {
+      title: '核销笔数',
+      dataIndex: 'total_verify_count',
+      width: 100,
+      hideInForm: true,
+      hideInSearch: true,
+      render: (v: number) => v ?? 0,
+    },
     {
       title: '省市区',
       dataIndex: 'region',
@@ -160,7 +178,11 @@ export default function MerchantPage() {
                 return;
               }
               try {
-                const res = await createAxios.post('/volunteer/merchant/geocode', {address: full});
+                const res = await createAxios({
+                  url: '/volunteer/merchant/geocode',
+                  method: 'post',
+                  data: {address: full},
+                });
                 const data = (res as any)?.data?.data;
                 if (data?.longitude != null && data?.latitude != null) {
                   form.setFieldsValue({longitude: data.longitude, latitude: data.latitude});
@@ -224,7 +246,18 @@ export default function MerchantPage() {
         operateRender={(_record, dom) => [dom.edit, dom.del]}
         handleFinish={async (values, mode, _form, defaultValue) => {
           const payload = buildPayload(values);
+          if (mode !== 'create' && !payload.logo && defaultValue?.logo) {
+            payload.logo = defaultValue.logo;
+          }
+          if (!payload.logo) {
+            window.$message?.error('请上传商户Logo');
+            return false;
+          }
           if (mode === 'create') {
+            if (!payload.password) {
+              window.$message?.error('请输入登录密码');
+              return false;
+            }
             await Create('/volunteer/merchant', payload);
             window.$message?.success('创建成功');
           } else {

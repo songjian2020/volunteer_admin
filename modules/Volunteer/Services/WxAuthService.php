@@ -75,13 +75,41 @@ class WxAuthService
         $wxUser->update($updates);
         $wxUser->refresh();
 
+        $avatar = $this->normalizeAvatarUrl((string) $wxUser->avatar);
+
         return [
             'token' => $wxUser->api_token,
             'openid' => $openid,
             'nickname' => $wxUser->nickname,
-            'avatar' => $wxUser->avatar,
+            'avatar' => $avatar,
+            'need_profile' => $this->isProfileIncomplete($wxUser),
             'is_dev' => !empty($session['is_dev']),
         ];
+    }
+
+    /** 尚未采集过头像或真实昵称：仅首次登录需要弹授权 */
+    public function isProfileIncomplete(VolWxUserModel $wxUser): bool
+    {
+        $nick = trim((string) $wxUser->nickname);
+        $avatar = trim((string) $wxUser->avatar);
+
+        return $avatar === '' || $nick === '' || $nick === '微信用户';
+    }
+
+    protected function normalizeAvatarUrl(string $avatar): string
+    {
+        $avatar = trim($avatar);
+        if ($avatar === '') {
+            return '';
+        }
+        if (preg_match('#^https?://(127\.0\.0\.1|localhost)(:\d+)?#i', $avatar)) {
+            $avatar = preg_replace('#^https?://(127\.0\.0\.1|localhost)(:\d+)?#i', '', $avatar) ?: '';
+        }
+        if (preg_match('#^https?://#i', $avatar)) {
+            return $avatar;
+        }
+
+        return public_site_url($avatar);
     }
 
     /**

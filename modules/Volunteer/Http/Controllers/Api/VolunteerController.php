@@ -17,8 +17,10 @@ use Modules\Volunteer\Services\VolunteerContext;
 use Modules\Volunteer\Services\WxAuthService;
 
 #[RequestAttribute('/api/volunteer.volunteer')]
+/** 小程序志愿者 / 微信用户相关接口 */
 class VolunteerController extends BaseController
 {
+    /** 微信 code 登录，可选写入昵称头像 */
     #[PostRoute('/login', false)]
     public function login(Request $request): JsonResponse
     {
@@ -37,6 +39,7 @@ class VolunteerController extends BaseController
         }
     }
 
+    /** 更新微信昵称 / 头像 URL */
     #[PostRoute('/updateProfile', false, MiniProgramAuthMiddleware::class)]
     public function updateProfile(Request $request): JsonResponse
     {
@@ -46,15 +49,19 @@ class VolunteerController extends BaseController
         }
         $data = $request->validate([
             'nickname' => 'nullable|string|max:50',
-            'avatar' => 'nullable|string|max:500',
+            'avatar' => 'nullable|string|max:1000',
         ]);
         $wxUser->update(array_filter($data, fn ($v) => $v !== null && $v !== ''));
         return $this->success([
             'nickname' => $wxUser->nickname,
-            'avatar' => $wxUser->avatar,
+            'avatar' => $this->normalizeAvatarUrl($wxUser->avatar),
         ], '资料已更新');
     }
 
+    /**
+     * 保存微信头像（独立落盘，不走通用文件服务 / MIME guesser）
+     * 支持 multipart 文件 或 avatar_base64
+     */
     #[PostRoute('/uploadAvatar', false, MiniProgramAuthMiddleware::class)]
     public function uploadAvatar(Request $request): JsonResponse
     {
@@ -62,20 +69,86 @@ class VolunteerController extends BaseController
         if (!$wxUser) {
             return $this->error('请登录后操作');
         }
-        $request->validate([
-            'file' => 'required|file|max:5120|mimes:jpg,jpeg,png,gif,webp',
-        ]);
+
+        $binary = $this->readAvatarBinary($request);
+        if ($binary === null || $binary === '') {
+            return $this->error('未收到头像数据');
+        }
+        if (strlen($binary) < 32) {
+            return $this->error('头像文件无效');
+        }
+        if (strlen($binary) > 5 * 1024 * 1024) {
+            return $this->error('头像不能超过 5MB');
+        }
+
+        $ext = $this->detectImageExt($binary);
+        $rel = 'avatar/' . date('Ymd') . '/' . uniqid('av_', true) . '.' . $ext;
+
         try {
-            $service = new \Modules\SystemTool\Services\SysFileService();
-            $result = $service->upload($request->file('file'), 0, 20, (int) $wxUser->id);
-            $url = $result['file_url'] ?? $result['preview_url'] ?? '';
-            if ($url !== '') {
-                $wxUser->update(['avatar' => $url]);
+            \Illuminate\Support\Facades\Storage::disk('local')->put($rel, $binary);
+            $url = $this->normalizeAvatarUrl(public_storage_url($rel));
+            if ($url === '') {
+                return $this->error('头像保存失败');
             }
+            $wxUser->update(['avatar' => $url]);
             return $this->success(['url' => $url, 'avatar' => $url], '上传成功');
         } catch (\Throwable $e) {
-            return $this->error($e->getMessage() ?: '上传失败');
+            return $this->error('头像保存失败，请重试');
         }
+    }
+
+    /** 从 multipart 或 base64 读取原始字节，禁止调用 guessExtension / getMimeType */
+    private function readAvatarBinary(Request $request): ?string
+    {
+        $b64 = trim((string) $request->input('avatar_base64', ''));
+        if ($b64 !== '') {
+            if (str_contains($b64, ',')) {
+                $b64 = substr($b64, strpos($b64, ',') + 1);
+            }
+            $decoded = base64_decode($b64, true);
+            return $decoded === false ? null : $decoded;
+        }
+
+        if (!$request->hasFile('file')) {
+            return null;
+        }
+        $tmp = $request->file('file')->getPathname();
+        if (!$tmp || !is_readable($tmp)) {
+            return null;
+        }
+        $data = file_get_contents($tmp);
+        return $data === false ? null : $data;
+    }
+
+    /** 按文件头识别图片扩展名，默认 jpg */
+    private function detectImageExt(string $binary): string
+    {
+        if (str_starts_with($binary, "\x89PNG\r\n\x1a\n")) {
+            return 'png';
+        }
+        if (str_starts_with($binary, 'GIF87a') || str_starts_with($binary, 'GIF89a')) {
+            return 'gif';
+        }
+        if (str_starts_with($binary, "RIFF") && str_contains(substr($binary, 8, 4), 'WEBP')) {
+            return 'webp';
+        }
+        return 'jpg';
+    }
+
+    /** 相对路径补全为绝对 URL，便于小程序 image 加载 */
+    private function normalizeAvatarUrl(?string $url): string
+    {
+        $url = trim((string) $url);
+        if ($url === '') {
+            return '';
+        }
+        if (preg_match('#^https?://(127\.0\.0\.1|localhost)(:\d+)?#i', $url)) {
+            $url = preg_replace('#^https?://(127\.0\.0\.1|localhost)(:\d+)?#i', '', $url) ?: '';
+        }
+        if (preg_match('#^https?://#i', $url)) {
+            return $url;
+        }
+        return public_site_url($url);
     }
 
     #[GetRoute('/registerConfig', false)]
@@ -96,7 +169,7 @@ class VolunteerController extends BaseController
                 'has_applied' => false,
                 'audit_status' => null,
                 'nickname' => $wxUser->nickname ?? '',
-                'avatar' => $wxUser->avatar ?? '',
+                'avatar' => $this->normalizeAvatarUrl($wxUser->avatar ?? ''),
             ]);
         }
 
@@ -111,7 +184,7 @@ class VolunteerController extends BaseController
         };
         $info['rank'] = VolVolunteerModel::getRank($volunteer->id);
         $info['nickname'] = $wxUser->nickname ?? '';
-        $info['avatar'] = $wxUser->avatar ?? '';
+        $info['avatar'] = $this->normalizeAvatarUrl($wxUser->avatar ?? '');
         if (!empty($info['phone']) && strlen($info['phone']) >= 7) {
             $info['phone_display'] = substr_replace($info['phone'], '****', 3, 4);
         } else {
@@ -329,12 +402,12 @@ class VolunteerController extends BaseController
             return $this->success([]);
         }
 
-        $status = $request->input('status', '');
+        $status = $request->input('status');
         $query = VolActivitySignupModel::with('activity:id,title,location,start_time,points')
             ->where('volunteer_id', $volunteer->id)
             ->orderByDesc('id');
 
-        if ($status !== '') {
+        if ($status !== null && $status !== '' && $status !== 'all') {
             $query->where('status', (int) $status);
         }
 

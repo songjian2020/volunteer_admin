@@ -264,4 +264,26 @@ function createAxios<Data, T = API.ResponseStructure<Data>>(
   return instance(axiosConfig) as Promise<AxiosResponse<T>>;
 }
 
-export default createAxios;
+/** 兼容 axios 风格调用：createAxios.put/post/get/delete */
+function attachMethod(
+  method: 'get' | 'post' | 'put' | 'delete'
+) {
+  return <Data = any>(url: string, data?: any, options?: AxiosRequestConfig) => {
+    const isBody = method === 'post' || method === 'put';
+    return createAxios<Data>({
+      url,
+      method,
+      ...(isBody ? { data } : { params: data }),
+      ...(options || {}),
+    });
+  };
+}
+
+const request = Object.assign(createAxios, {
+  get: attachMethod('get'),
+  post: attachMethod('post'),
+  put: attachMethod('put'),
+  delete: attachMethod('delete'),
+});
+
+export default request;

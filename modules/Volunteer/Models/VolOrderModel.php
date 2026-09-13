@@ -26,6 +26,16 @@ class VolOrderModel extends Model
         return $this->belongsTo(VolGoodsModel::class, 'goods_id');
     }
 
+    public function merchant(): BelongsTo
+    {
+        return $this->belongsTo(VolMerchantModel::class, 'merchant_id');
+    }
+
+    public function verifyMerchant(): BelongsTo
+    {
+        return $this->belongsTo(VolMerchantModel::class, 'verify_merchant_id');
+    }
+
     public function getStatusTextAttribute(): string
     {
         return match ((int) $this->status) {

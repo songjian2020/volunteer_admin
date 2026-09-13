@@ -50,13 +50,16 @@ class GoodsManageController extends BaseController
         return $this->success();
     }
 
-    #[PutRoute(route: '/{id}/audit', authorize: 'audit', where: ['id' => '[0-9]+'])]
+    #[PutRoute(route: '/{id}/audit', authorize: 'query', where: ['id' => '[0-9]+'])]
+    #[PostRoute(route: '/{id}/audit', authorize: 'query', where: ['id' => '[0-9]+'])]
     public function audit(int $id, Request $request): JsonResponse
     {
         $model = VolGoodsModel::find($id);
-        if (!$model) return $this->error('商品不存在');
+        if (!$model) {
+            return $this->error('商品不存在');
+        }
         $model->update(['status' => (int) $request->input('status', 1)]);
-        return $this->success();
+        return $this->success([], '操作成功');
     }
 
     #[DeleteRoute(route: '/{id}', authorize: 'delete', where: ['id' => '[0-9]+'])]

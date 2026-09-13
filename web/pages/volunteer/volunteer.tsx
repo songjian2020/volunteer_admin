@@ -1,5 +1,5 @@
 import XinTable from '@/components/XinTable';
-import {Badge, Button, Modal, Space, Typography} from 'antd';
+import {Badge, Button, Input, InputNumber, Modal, Space, Typography} from 'antd';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import createAxios from '@/utils/request';
 import {useRef} from 'react';
@@ -39,14 +39,24 @@ export default function VolunteerPage() {
       title: '调整积分',
       content: (
         <Space direction="vertical" style={{width: '100%'}}>
-          <input placeholder="积分(正数增加，负数扣减)" onChange={e => points = Number(e.target.value)} />
-          <input placeholder="原因" defaultValue={reason} onChange={e => reason = e.target.value} />
+          <InputNumber placeholder="积分(正数增加，负数扣减)" style={{width: '100%'}} onChange={v => { points = Number(v || 0); }} />
+          <Input placeholder="原因" defaultValue={reason} onChange={e => { reason = e.target.value; }} />
         </Space>
       ),
-      onOk: () => createAxios.post(`/volunteer/volunteer/${record.id}/points`, {points, reason}).then(() => {
-        window.$message?.success('操作成功');
-        void tableRef.current?.reload();
-      }),
+      onOk: () => {
+        if (!points) {
+          window.$message?.warning('积分不能为0');
+          return Promise.reject();
+        }
+        return createAxios({
+          url: `/volunteer/volunteer/${record.id}/points`,
+          method: 'post',
+          data: {points, reason},
+        }).then(() => {
+          window.$message?.success('操作成功');
+          void tableRef.current?.reload();
+        });
+      },
     });
   };
 

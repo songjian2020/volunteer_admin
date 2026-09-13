@@ -50,11 +50,11 @@ class SysFileController extends BaseController
     public function uploadImage(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'file' => 'required|file',
+            'file' => 'required',
             'group_id' => [
-                'required', 'integer',
+                'nullable', 'integer',
                 function ($attribute, $value, $fail) {
-                    if ($value == 0) {
+                    if ($value == 0 || $value === null || $value === '') {
                         return;
                     }
                     if (!\DB::table('sys_file_group')->where('id', $value)->exists()) {
@@ -63,12 +63,24 @@ class SysFileController extends BaseController
                 },
             ],
         ]);
-        $result = $this->service->upload(
-            $data['file'],
-            $data['group_id'],
-            10,
-            Auth::id()
-        );
+        $file = $request->file('file');
+        if (!$file) {
+            return $this->error('请选择要上传的文件');
+        }
+        try {
+            $result = $this->service->upload(
+                $file,
+                (int) ($data['group_id'] ?? 0),
+                10,
+                Auth::id()
+            );
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'finfo') || str_contains($msg, 'MIME')) {
+                return $this->error('图片上传失败：服务器无法识别文件类型，请换一张图片重试');
+            }
+            return $this->error($msg !== '' ? $msg : '图片上传失败');
+        }
         return $this->success($result);
     }
 

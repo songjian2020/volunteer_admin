@@ -7,6 +7,7 @@ import type { RcFile } from 'antd/es/upload';
 import type { ImageUploaderProps } from './typings';
 import type { ISysFileInfo } from '@/domain/iSysFile';
 import { useTranslation } from 'react-i18next';
+import { resolveUploadedFileUrl } from '@/utils/uploadUrl';
 
 /**
  * 图片上传组件
@@ -35,7 +36,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     uid: file.id?.toString() || `${file.id}`,
     name: file.file_name || `image-${file.id}`,
     status: 'done',
-    url: file.preview_url,
+    url: resolveUploadedFileUrl(file),
     response: {
       success: true,
       data: file,

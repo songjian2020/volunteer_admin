@@ -51,7 +51,7 @@ function SearchForm<T extends Record<string, any> = any>(props: SearchFormProps<
 
     // Form.Item 允许的属性列表
     const formItemPropKeys = [
-      'colon', 'extra', 'getValueFromEvent', 'help', 'htmlFor',
+      'colon', 'extra', 'getValueFromEvent', 'getValueProps', 'help', 'htmlFor',
       'initialValue', 'labelAlign', 'labelCol', 'name', 'normalize',
       'noStyle', 'tooltip', 'wrapperCol', 'layout'
     ];

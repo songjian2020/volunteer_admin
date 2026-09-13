@@ -68,4 +68,22 @@ class PointsService
     {
         return strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 10));
     }
+
+    /** 从扫码/识图结果中提取兑换码（兼容 WSS-EX: 前缀与纯码） */
+    public static function normalizeExchangeCode(string $raw): string
+    {
+        $text = trim($raw);
+        if ($text === '') {
+            return '';
+        }
+        if (preg_match('/WSS-EX[:：=\/\s]*([A-Za-z0-9]+)/i', $text, $m)) {
+            return strtoupper($m[1]);
+        }
+        if (preg_match('/[?&](?:code|c)=([A-Za-z0-9]+)/i', $text, $m)) {
+            return strtoupper($m[1]);
+        }
+        $text = preg_replace('/\s+/', '', $text) ?: '';
+
+        return strtoupper($text);
+    }
 }

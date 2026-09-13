@@ -1,0 +1,1 @@
+import{t as e}from"./user-B0WE9msY.js";function t(){let t=e(e=>e.access);return{auth:e=>t.includes(e)}}export{t};

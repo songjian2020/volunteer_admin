@@ -111,22 +111,44 @@ class MallController extends BaseController
             return $this->success([]);
         }
 
-        $status = $request->input('status', '');
+        $status = $request->input('status');
         $query = VolOrderModel::with('goods:id,image_url')
             ->where('volunteer_id', $volunteer->id)
             ->orderByDesc('id');
 
-        if ($status !== '') {
+        if ($status !== null && $status !== '' && $status !== 'all') {
             $query->where('status', (int) $status);
         }
 
         $list = $query->get()->map(function ($item) {
             $row = $item->toArray();
             $row['image_url'] = $item->goods->image_url ?? '';
+            $row['status'] = (string) $item->status;
             unset($row['goods']);
             return $row;
         });
 
         return $this->success($list);
+    }
+
+    #[GetRoute('/orderDetail', false, MiniProgramAuthMiddleware::class)]
+    public function orderDetail(Request $request): JsonResponse
+    {
+        $volunteer = VolunteerContext::volunteer($request);
+        if (!$volunteer) {
+            return $this->error('请先登录');
+        }
+        $id = (int) $request->input('id', 0);
+        $order = VolOrderModel::with('goods:id,image_url,name')
+            ->where('volunteer_id', $volunteer->id)
+            ->find($id);
+        if (!$order) {
+            return $this->error('订单不存在');
+        }
+        $row = $order->toArray();
+        $row['image_url'] = $order->goods->image_url ?? '';
+        $row['status'] = (string) $order->status;
+        unset($row['goods']);
+        return $this->success($row);
     }
 }

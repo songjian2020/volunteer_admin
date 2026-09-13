@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Upload, message, Button, Space, Select, Input, Card } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { UploadFile, UploadProps } from 'antd';
+import { resolveUploadedFileUrl } from '@/utils/uploadUrl';
 
 export interface UrlImageUploadProps {
   value?: string | string[];
@@ -38,7 +39,7 @@ const UrlImageUpload: React.FC<UrlImageUploadProps> = ({
         uid: `${index}-${url}`,
         name: `image-${index}`,
         status: 'done' as const,
-        url,
+        url: resolveUploadedFileUrl(url),
       })),
     );
   }, [value]);
@@ -56,7 +57,7 @@ const UrlImageUpload: React.FC<UrlImageUploadProps> = ({
   const emitChange = (list: UploadFile[]) => {
     const urls = list
       .filter((f) => f.status === 'done')
-      .map((f) => f.url || f.response?.data?.file_url || f.response?.data?.preview_url || '')
+      .map((f) => resolveUploadedFileUrl(f.url || f.response?.data) || '')
       .filter(Boolean);
     if (mode === 'single') {
       onChange?.(urls[0] || '');
@@ -67,13 +68,15 @@ const UrlImageUpload: React.FC<UrlImageUploadProps> = ({
 
   const handleChange: UploadProps['onChange'] = ({ fileList: nextList, file }) => {
     setFileList(nextList);
+    if (file.status !== 'done' && file.status !== 'removed' && file.status !== 'error') {
+      return;
+    }
     if (file.status === 'done' || file.status === 'removed' || nextList.every((f) => f.status === 'done' || f.status === 'error')) {
       const done = nextList.filter((f) => f.status === 'done').map((f) => {
-        if (f.url) return f;
-        const url = f.response?.data?.file_url || f.response?.data?.preview_url || '';
+        const url = resolveUploadedFileUrl(f.response?.data || f.url);
         return { ...f, url };
       });
-      setFileList(done.concat(nextList.filter((f) => f.status !== 'done')));
+      setFileList(done.concat(nextList.filter((f) => f.status !== 'done' && f.status !== 'removed')));
       emitChange(done);
     }
     if (file.status === 'error') {

@@ -1,5 +1,5 @@
 import XinTable from '@/components/XinTable';
-import {Badge, Button, Typography} from 'antd';
+import {Badge, Button, Modal, Typography} from 'antd';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import createAxios from '@/utils/request';
 import {useRef} from 'react';
@@ -30,10 +30,22 @@ export default function MerchantPendingPage() {
       ? <Badge status="error" text="已拒绝"/> : <Badge status="processing" text="待审核"/>},
   ];
 
-  const audit = (id: number, status: number) => {
-    createAxios.put(`/volunteer/merchant/${id}/audit`, {audit_status: status}).then(() => {
-      window.$message?.success('操作成功');
-      void tableRef.current?.reload();
+  const audit = (record: IMerchant, status: number) => {
+    const pass = status === 1;
+    Modal.confirm({
+      title: pass ? '确认通过该商户？' : '确认拒绝该商户？',
+      content: `${record.name || '该商户'}（${record.account || record.phone || '-'}）`,
+      okText: pass ? '通过' : '拒绝',
+      okButtonProps: pass ? undefined : {danger: true},
+      cancelText: '取消',
+      onOk: () => createAxios({
+        url: `/volunteer/merchant/${record.id}/audit`,
+        method: 'post',
+        data: {audit_status: status},
+      }).then(() => {
+        window.$message?.success(pass ? '已通过' : '已拒绝');
+        void tableRef.current?.reload();
+      }),
     });
   };
 
@@ -52,8 +64,8 @@ export default function MerchantPendingPage() {
         operateWidth={140}
         requestParams={(params) => ({...params, audit_status: 0})}
         operateRender={(record) => [
-          record.audit_status !== 1 && <Button key="pass" size="small" type="link" onClick={() => audit(record.id, 1)}>通过</Button>,
-          record.audit_status !== 2 && <Button key="reject" size="small" type="link" danger onClick={() => audit(record.id, 2)}>拒绝</Button>,
+          record.audit_status !== 1 && <Button key="pass" size="small" type="link" onClick={() => audit(record, 1)}>通过</Button>,
+          record.audit_status !== 2 && <Button key="reject" size="small" type="link" danger onClick={() => audit(record, 2)}>拒绝</Button>,
         ].filter(Boolean)}
       />
     </>

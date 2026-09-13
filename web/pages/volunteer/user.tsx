@@ -42,7 +42,10 @@ export default function WxUserPage() {
   const reload = () => tableRef.current?.reload();
 
   const handleRevoke = (record: IWxUser) => {
-    createAxios.post(`/volunteer/user/${record.id}/revoke`).then(() => {
+    createAxios({
+      url: `/volunteer/user/${record.id}/revoke`,
+      method: 'post',
+    }).then(() => {
       window.$message?.success('已撤销授权');
       void reload();
     });

@@ -47,7 +47,16 @@ class ExceptionsHandler extends ExceptionHandler
                     'success' => false
                 ], 401);
             },
-            NotFoundHttpException::class => function ($e) {
+            NotFoundHttpException::class => function ($e) use ($request) {
+                if (!$request->expectsJson() && !$request->ajax() && str_contains((string) $request->header('Accept', ''), 'text/html')) {
+                    $index = public_path('index.html');
+                    if (is_file($index)) {
+                        return response(file_get_contents($index), 200, [
+                            'Content-Type' => 'text/html; charset=UTF-8',
+                            'Cache-Control' => 'no-cache',
+                        ]);
+                    }
+                }
                 return $this->notification(
                     'Route Not Exist',
                     __('system.error.route_not_exist'),

@@ -89,7 +89,7 @@ function XinForm<T extends Record<string, any> = any>(props: XinFormProps<T>) {
 
     // Form.Item 允许的属性列表
     const formItemPropKeys = [
-      'colon', 'extra', 'getValueFromEvent', 'help', 'hidden', 'htmlFor',
+      'colon', 'extra', 'getValueFromEvent', 'getValueProps', 'help', 'hidden', 'htmlFor',
       'initialValue',   'name', 'normalize',
       'noStyle', 'preserve', 'tooltip', 'trigger',
       // 验证相关

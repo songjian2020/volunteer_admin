@@ -1,5 +1,5 @@
 import XinTable from '@/components/XinTable';
-import {Badge, Button, Typography} from 'antd';
+import {Badge, Button, Modal, Typography} from 'antd';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import createAxios from '@/utils/request';
 import {useRef} from 'react';
@@ -32,9 +32,21 @@ export default function VolunteerPendingPage() {
   ];
 
   const handleAudit = (record: IVolunteer, status: number) => {
-    createAxios.put(`/volunteer/volunteer/${record.id}/audit`, {audit_status: status}).then(() => {
-      window.$message?.success('操作成功');
-      void tableRef.current?.reload();
+    const pass = status === 1;
+    Modal.confirm({
+      title: pass ? '确认通过该志愿者？' : '确认拒绝该志愿者？',
+      content: `${record.name || '该申请人'}（${record.phone || '-'}）`,
+      okText: pass ? '通过' : '拒绝',
+      okButtonProps: pass ? undefined : {danger: true},
+      cancelText: '取消',
+      onOk: () => createAxios({
+        url: `/volunteer/volunteer/${record.id}/audit`,
+        method: 'post',
+        data: {audit_status: status},
+      }).then(() => {
+        window.$message?.success(pass ? '已通过' : '已拒绝');
+        void tableRef.current?.reload();
+      }),
     });
   };
 

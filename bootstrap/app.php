@@ -10,6 +10,7 @@ use Modules\Common\Console\Commands\GenerateRouteHelperCommand;
 use Modules\Common\Middlewares\AllowCrossDomainMiddleware;
 use Modules\Common\Middlewares\LanguageMiddleware;
 use Modules\SystemTool\Http\Middleware\LoadAppSettingsMiddleware;
+use App\Http\Middleware\ServeSpaMiddleware;
 use Modules\SystemUser\Http\Middleware\AuthGuardMiddleware;
 use Modules\SystemUser\Http\Middleware\LoginLogMiddleware;
 
@@ -18,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php'
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // HTTPS 反代后识别真实协议，避免生成 http 图片地址
+        $middleware->trustProxies(at: '*');
+        // 浏览器刷新前端路由时回退到 SPA
+        $middleware->prepend(ServeSpaMiddleware::class);
         // 全局跨域中间件
         $middleware->append(AllowCrossDomainMiddleware::class);
         $middleware->append(LanguageMiddleware::class);

@@ -32,7 +32,7 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => public_path('storage'),
-            'url' => env('FILESYSTEM_LOCAL_URL', env('APP_URL').'/storage'),
+            'url' => env('FILESYSTEM_LOCAL_URL', '/storage'),
             'visibility' => 'public',
             'throw' => false,
         ],

@@ -13,8 +13,20 @@ class VolPointsLogModel extends Model
         'volunteer_id', 'type', 'reason', 'points', 'related_type', 'related_id',
     ];
 
+    protected $appends = ['type_text'];
+
     public function volunteer(): BelongsTo
     {
         return $this->belongsTo(VolVolunteerModel::class, 'volunteer_id');
+    }
+
+    public function getTypeTextAttribute(): string
+    {
+        return match ((string) $this->type) {
+            'activity' => '活动服务',
+            'exchange' => '积分兑换',
+            'manual' => '管理员调整',
+            default => $this->type ?: '-',
+        };
     }
 }

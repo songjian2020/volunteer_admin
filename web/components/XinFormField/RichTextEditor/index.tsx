@@ -3,6 +3,7 @@ import { Editor, Toolbar } from '@wangeditor/editor-for-react';
 import type { IDomEditor, IEditorConfig, IToolbarConfig } from '@wangeditor/editor';
 import '@wangeditor/editor/dist/css/style.css';
 import { message } from 'antd';
+import { resolveUploadedFileUrl } from '@/utils/uploadUrl';
 
 export interface RichTextEditorProps {
   value?: string;
@@ -67,7 +68,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               return;
             }
             const data = json?.data || json;
-            const url = data?.file_url || data?.preview_url || '';
+            const url = resolveUploadedFileUrl(data);
             if (!url) {
               message.error('图片上传失败：未返回地址');
               return;

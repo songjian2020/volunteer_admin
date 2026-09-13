@@ -1,5 +1,5 @@
 import XinTable from '@/components/XinTable';
-import {Badge, Button, DatePicker, Image, Modal, QRCode, Space, Typography} from 'antd';
+import {Badge, Button, Image, Modal, QRCode, Space, Typography} from 'antd';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import {Create, Update} from '@/api/common/table';
 import createAxios from '@/utils/request';
@@ -41,26 +41,30 @@ const statusOptions = [
 ];
 
 const toDayjs = (value: unknown): Dayjs | null => {
-  if (!value) return null;
-  if (dayjs.isDayjs(value)) return value;
-  if (typeof value === 'number') return dayjs.unix(value);
-  return dayjs(value as string);
+  if (value === null || value === undefined || value === '' || value === 0) return null;
+  if (dayjs.isDayjs(value)) return value.isValid() ? value : null;
+  if (typeof value === 'number') {
+    const parsed = value > 9999999999 ? dayjs(value) : dayjs.unix(value);
+    return parsed.isValid() ? parsed : null;
+  }
+  const parsed = dayjs(value as string);
+  return parsed.isValid() ? parsed : null;
 };
 
 const toUnix = (value: unknown): number | null => {
-  if (!value) return null;
+  if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return value;
-  return dayjs(value as Dayjs).unix();
+  const parsed = dayjs.isDayjs(value) ? value : dayjs(value as string);
+  return parsed.isValid() ? parsed.unix() : null;
 };
 
-const dateTimeFieldRender = (field: keyof IActivity) => (form: { getFieldValue: (name: string) => unknown; setFieldValue: (name: string, value: Dayjs | null) => void }) => (
-  <DatePicker
-    showTime
-    style={{width: '100%'}}
-    value={toDayjs(form.getFieldValue(field as string))}
-    onChange={(value) => form.setFieldValue(field as string, value)}
-  />
-);
+const unixDateTimeField = {
+  valueType: 'dateTime' as const,
+  getValueProps: (value: unknown) => ({value: toDayjs(value)}),
+  normalize: (value: unknown) => toUnix(value),
+  fieldProps: {showTime: true, style: {width: '100%'}, format: 'YYYY-MM-DD HH:mm'},
+  render: (v: number) => (v ? dayjs.unix(v).format('YYYY-MM-DD HH:mm') : '-'),
+};
 
 export default function ActivityPage() {
   const tableRef = useRef<XinTableInstance<IActivity>>(null);
@@ -74,12 +78,19 @@ export default function ActivityPage() {
 
   const refreshCodes = async () => {
     if (!current?.id) return;
-    const res = await createAxios.post(`/volunteer/activity/${current.id}/refreshCodes`);
-    const data = (res as any)?.data?.data;
-    if (data) {
-      setCurrent({...current, ...data});
-      window.$message?.success('签到码已刷新');
-      void tableRef.current?.reload();
+    try {
+      const res = await createAxios({
+        url: `/volunteer/activity/${current.id}/refreshCodes`,
+        method: 'post',
+      });
+      const data = (res as any)?.data?.data;
+      if (data) {
+        setCurrent({...current, ...data});
+        window.$message?.success('签到码已刷新');
+        void tableRef.current?.reload();
+      }
+    } catch {
+      // 错误提示由 request 拦截器统一处理
     }
   };
 
@@ -139,32 +150,28 @@ export default function ActivityPage() {
       dataIndex: 'signup_start_time',
       colProps: {span: 12},
       hideInSearch: true,
-      fieldRender: dateTimeFieldRender('signup_start_time'),
-      render: (v: number) => (v ? dayjs.unix(v).format('YYYY-MM-DD HH:mm') : '-'),
+      ...unixDateTimeField,
     },
     {
       title: '报名截止',
       dataIndex: 'signup_end_time',
       colProps: {span: 12},
       hideInSearch: true,
-      fieldRender: dateTimeFieldRender('signup_end_time'),
-      render: (v: number) => (v ? dayjs.unix(v).format('YYYY-MM-DD HH:mm') : '-'),
+      ...unixDateTimeField,
     },
     {
       title: '开始时间',
       dataIndex: 'start_time',
       colProps: {span: 12},
       hideInSearch: true,
-      fieldRender: dateTimeFieldRender('start_time'),
-      render: (v: number) => (v ? dayjs.unix(v).format('YYYY-MM-DD HH:mm') : '-'),
+      ...unixDateTimeField,
     },
     {
       title: '结束时间',
       dataIndex: 'end_time',
       colProps: {span: 12},
       hideInSearch: true,
-      fieldRender: dateTimeFieldRender('end_time'),
-      render: (v: number) => (v ? dayjs.unix(v).format('YYYY-MM-DD HH:mm') : '-'),
+      ...unixDateTimeField,
     },
     {
       title: '状态',
@@ -195,7 +202,7 @@ export default function ActivityPage() {
         formLayoutType="DrawerForm"
         drawerProps={{width: 860}}
         formProps={{grid: true, colProps: {span: 12}, layout: 'vertical'}}
-        createInitialValues={{status: 1}}
+        createInitialValues={{status: 1, points: 10, recruit_count: 20}}
         operateProps={{width: 200}}
         operateRender={(record, dom) => [
           <Button key="qr" size="small" type="link" onClick={() => openQr(record)}>签到码</Button>,

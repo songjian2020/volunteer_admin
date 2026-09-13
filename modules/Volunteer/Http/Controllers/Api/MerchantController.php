@@ -12,9 +12,12 @@ use Modules\AnnoRoute\Attribute\RequestAttribute;
 use Modules\Common\Http\Controllers\BaseController;
 use Modules\SystemTool\Services\SysFileService;
 use Modules\Volunteer\Http\Middleware\MerchantAuthMiddleware;
+use Modules\Volunteer\Http\Middleware\MiniProgramAuthMiddleware;
 use Modules\Volunteer\Models\VolGoodsModel;
 use Modules\Volunteer\Models\VolMerchantModel;
 use Modules\Volunteer\Models\VolOrderModel;
+use Modules\Volunteer\Services\PointsService;
+use Modules\Volunteer\Services\VolunteerContext;
 
 #[RequestAttribute('/api/volunteer.merchant')]
 class MerchantController extends BaseController
@@ -72,6 +75,44 @@ class MerchantController extends BaseController
         }
 
         return $this->success($list);
+    }
+
+    /**
+     * 当前微信用户是否已是商户（按志愿者手机号匹配商户联系电话）
+     */
+    #[GetRoute('/checkStatus', false, MiniProgramAuthMiddleware::class)]
+    public function checkStatus(Request $request): JsonResponse
+    {
+        $volunteer = VolunteerContext::volunteer($request);
+        $phone = trim((string) ($volunteer->phone ?? ''));
+        if ($phone === '') {
+            return $this->success([
+                'is_merchant' => false,
+                'audit_status' => null,
+                'merchant_name' => '',
+            ]);
+        }
+
+        $merchant = VolMerchantModel::query()
+            ->where('phone', $phone)
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$merchant) {
+            return $this->success([
+                'is_merchant' => false,
+                'audit_status' => null,
+                'merchant_name' => '',
+            ]);
+        }
+
+        return $this->success([
+            // 已提交过入驻（含待审/通过/拒绝）均视为“是商户”，入口显示登录
+            'is_merchant' => true,
+            'audit_status' => (int) $merchant->audit_status,
+            'merchant_name' => $merchant->name,
+            'can_login' => (int) $merchant->audit_status === 1 && (int) $merchant->status === 1,
+        ]);
     }
 
     #[PostRoute('/login', false)]
@@ -217,13 +258,13 @@ class MerchantController extends BaseController
     public function verify(Request $request): JsonResponse
     {
         $merchantId = $request->attributes->get('merchant_id');
-        $code = trim($request->input('code', ''));
+        $code = PointsService::normalizeExchangeCode((string) $request->input('code', ''));
         if ($code === '') {
             return $this->error('请输入兑换码');
         }
 
         $order = VolOrderModel::with('volunteer:id,name')
-            ->where('exchange_code', $code)
+            ->whereRaw('UPPER(exchange_code) = ?', [$code])
             ->first();
 
         if (!$order) {

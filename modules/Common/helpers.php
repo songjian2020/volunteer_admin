@@ -35,6 +35,60 @@ if (! function_exists('web_path')) {
     }
 }
 
+if (! function_exists('public_site_url')) {
+    /**
+     * 当前站点可访问的绝对地址。
+     * 优先用本次请求的域名/协议，避免 APP_URL 仍是 127.0.0.1 导致图片无法回显。
+     */
+    function public_site_url(string $path = ''): string
+    {
+        $path = '/' . ltrim(str_replace('\\', '/', $path), '/');
+        if ($path === '/') {
+            $path = '';
+        }
+
+        $base = '';
+        try {
+            $request = request();
+            $host = (string) $request?->getHost();
+            if ($host !== '') {
+                $base = rtrim($request->getSchemeAndHttpHost(), '/');
+                $forwardedProto = strtolower((string) $request->header('X-Forwarded-Proto', ''));
+                if (str_contains($forwardedProto, 'https') && str_starts_with($base, 'http://')) {
+                    $base = 'https://' . substr($base, 7);
+                }
+            }
+        } catch (\Throwable $e) {
+            $base = '';
+        }
+
+        if ($base === '') {
+            $base = rtrim((string) config('app.url'), '/');
+        }
+
+        if ($base === '') {
+            return $path;
+        }
+
+        return $base . $path;
+    }
+}
+
+if (! function_exists('public_storage_url')) {
+    /**
+     * 本地磁盘文件的公开访问地址：/storage/{file_path}
+     */
+    function public_storage_url(?string $filePath): string
+    {
+        $filePath = ltrim((string) $filePath, '/');
+        if ($filePath === '') {
+            return '';
+        }
+
+        return public_site_url('storage/' . $filePath);
+    }
+}
+
 if (! function_exists('getTreeData')) {
     /**
      * 获取树形数据

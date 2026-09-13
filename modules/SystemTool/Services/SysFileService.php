@@ -64,11 +64,20 @@ class SysFileService
      */
     public function upload(UploadedFile $file, int $groupId = 0, int $channel = 0, ?int $user_id = null): array
     {
-        // 文件扩展名
-        $fileExt = strtolower($file->getClientOriginalExtension() ?: $file->extension());
-
-        if (empty($fileExt)) {
-            throw new HttpResponseException(['success' => false, 'msg' => '无法识别的文件扩展名']);
+        $originalName = (string) $file->getClientOriginalName();
+        $fileExt = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
+        $realPath = $file->getRealPath();
+        $contents = (is_string($realPath) && is_file($realPath))
+            ? (string) file_get_contents($realPath)
+            : '';
+        if ($contents === '') {
+            throw new HttpResponseException(['success' => false, 'msg' => __('system.file.upload_failed')]);
+        }
+        if ($fileExt === '') {
+            $fileExt = $this->extensionFromMagicBytes($contents);
+        }
+        if ($fileExt === '') {
+            $fileExt = 'bin';
         }
         // 推断文件类型
         $fileType = FileType::guessFromExtension($fileExt);
@@ -77,7 +86,7 @@ class SysFileService
         // 获取磁盘
         $disk = StorageSettings::get('filesystems.default', 'local');
         // 存储文件并设置可见性
-        $stored = $this->disk($disk)->put($storagePath, $file->getContent(), 'public');
+        $stored = $this->disk($disk)->put($storagePath, $contents, 'public');
         if (!$stored) {
             throw new HttpResponseException(['success' => false, 'msg' => __('system.file.upload_failed')]);
         }
@@ -88,12 +97,31 @@ class SysFileService
         $model->channel = $channel;
         $model->file_type = $fileType->value;
         $model->file_path = $storagePath;
-        $model->file_name = $file->getClientOriginalName();
-        $model->file_size = $file->getSize();
+        $model->file_name = $originalName !== '' ? $originalName : ('upload.' . $fileExt);
+        $model->file_size = strlen($contents);
         $model->file_ext = $fileExt;
         $model->uploader_id = $user_id;
         $model->save();
         return $model->toArray();
+    }
+
+    /** 不依赖 finfo，按文件头识别常见图片扩展名 */
+    protected function extensionFromMagicBytes(string $contents): string
+    {
+        $head = substr($contents, 0, 16);
+        if (str_starts_with($head, "\xFF\xD8\xFF")) {
+            return 'jpg';
+        }
+        if (str_starts_with($head, "\x89PNG\r\n\x1A\n")) {
+            return 'png';
+        }
+        if (str_starts_with($head, 'GIF87a') || str_starts_with($head, 'GIF89a')) {
+            return 'gif';
+        }
+        if (str_starts_with($head, 'RIFF') && substr($contents, 8, 4) === 'WEBP') {
+            return 'webp';
+        }
+        return '';
     }
 
     /**
