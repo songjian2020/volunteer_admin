@@ -2,11 +2,12 @@ import XinTable from '@/components/XinTable';
 import {Badge, Button, Modal, Typography} from 'antd';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import createAxios from '@/utils/request';
-import {useRef} from 'react';
+import {useRef, useState} from 'react';
+import VolunteerDetailModal, {type VolunteerDetailRecord} from '../components/VolunteerDetailModal';
 
 const {Title, Text} = Typography;
 
-interface IVolunteer {
+interface IVolunteer extends VolunteerDetailRecord {
   id: number;
   name: string;
   phone: string;
@@ -19,6 +20,7 @@ interface IVolunteer {
 
 export default function VolunteerPendingPage() {
   const tableRef = useRef<XinTableInstance<IVolunteer>>(null);
+  const [detail, setDetail] = useState<IVolunteer | null>(null);
 
   const columns: XinTableColumn<IVolunteer>[] = [
     {title: 'ID', dataIndex: 'id', width: 70},
@@ -62,13 +64,15 @@ export default function VolunteerPendingPage() {
         addShow={false}
         editShow={false}
         deleteShow={false}
-        operateWidth={140}
+        operateWidth={200}
         requestParams={(params) => ({...params, audit_status: 0})}
         operateRender={(record) => [
+          <Button key="detail" size="small" type="link" onClick={() => setDetail(record)}>查看详情</Button>,
           record.audit_status !== 1 && <Button key="pass" size="small" type="link" onClick={() => handleAudit(record, 1)}>通过</Button>,
           record.audit_status !== 2 && <Button key="reject" size="small" type="link" danger onClick={() => handleAudit(record, 2)}>拒绝</Button>,
         ].filter(Boolean)}
       />
+      <VolunteerDetailModal open={!!detail} record={detail} onClose={() => setDetail(null)} />
     </>
   );
 }

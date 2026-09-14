@@ -2,23 +2,15 @@ import XinTable from '@/components/XinTable';
 import {Badge, Button, Input, InputNumber, Modal, Space, Typography} from 'antd';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import createAxios from '@/utils/request';
-import {useRef} from 'react';
+import {useRef, useState} from 'react';
+import VolunteerDetailModal, {type VolunteerDetailRecord} from './components/VolunteerDetailModal';
 
 const {Title, Text} = Typography;
 
-interface IVolunteer {
+interface IVolunteer extends VolunteerDetailRecord {
   id: number;
   name: string;
   phone: string;
-  gender?: string;
-  age?: number;
-  education?: string;
-  political_status?: string;
-  id_card?: string;
-  address?: string;
-  specialty?: string;
-  emergency_contact?: string;
-  emergency_phone?: string;
   audit_status: number;
   total_points: number;
   total_hours: number;
@@ -33,6 +25,7 @@ const genderOptions = [
 
 export default function VolunteerPage() {
   const tableRef = useRef<XinTableInstance<IVolunteer>>(null);
+  const [detail, setDetail] = useState<IVolunteer | null>(null);
 
   const columns: XinTableColumn<IVolunteer>[] = [
     {title: 'ID', dataIndex: 'id', width: 70, hideInForm: true},
@@ -180,13 +173,15 @@ export default function VolunteerPage() {
         drawerProps={{width: 720}}
         formProps={{grid: true, colProps: {span: 12}, layout: 'vertical'}}
         createInitialValues={{gender: '1'}}
-        operateWidth={120}
+        operateWidth={180}
         requestParams={(params) => ({...params, audit_status: 1})}
         operateRender={(record, dom) => [
+          <Button key="detail" size="small" type="link" onClick={() => setDetail(record)}>查看详情</Button>,
           <Button key="points" size="small" type="link" onClick={() => handleAdjustPoints(record)}>调积分</Button>,
           dom.del,
         ]}
       />
+      <VolunteerDetailModal open={!!detail} record={detail} onClose={() => setDetail(null)} />
     </>
   );
 }
