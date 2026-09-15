@@ -1,5 +1,6 @@
 import XinTable from '@/components/XinTable';
-import {Badge, Button, Modal, Typography} from 'antd';
+import {Badge, Button, Modal, Tooltip, Typography} from 'antd';
+import {CheckOutlined, CloseOutlined, EyeOutlined} from '@ant-design/icons';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import createAxios from '@/utils/request';
 import {useRef, useState} from 'react';
@@ -67,9 +68,19 @@ export default function VolunteerPendingPage() {
         operateWidth={200}
         requestParams={(params) => ({...params, audit_status: 0})}
         operateRender={(record) => [
-          <Button key="detail" size="small" type="link" onClick={() => setDetail(record)}>查看详情</Button>,
-          record.audit_status !== 1 && <Button key="pass" size="small" type="link" onClick={() => handleAudit(record, 1)}>通过</Button>,
-          record.audit_status !== 2 && <Button key="reject" size="small" type="link" danger onClick={() => handleAudit(record, 2)}>拒绝</Button>,
+          <Tooltip title="查看详情" key="detail">
+            <Button type="primary" size="small" icon={<EyeOutlined />} onClick={() => setDetail(record)} />
+          </Tooltip>,
+          record.audit_status !== 1 && (
+            <Tooltip title="通过" key="pass">
+              <Button type="primary" size="small" icon={<CheckOutlined />} onClick={() => handleAudit(record, 1)} />
+            </Tooltip>
+          ),
+          record.audit_status !== 2 && (
+            <Tooltip title="拒绝" key="reject">
+              <Button danger type="primary" size="small" icon={<CloseOutlined />} onClick={() => handleAudit(record, 2)} />
+            </Tooltip>
+          ),
         ].filter(Boolean)}
       />
       <VolunteerDetailModal open={!!detail} record={detail} onClose={() => setDetail(null)} />

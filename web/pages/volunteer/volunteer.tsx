@@ -1,5 +1,6 @@
 import XinTable from '@/components/XinTable';
-import {Badge, Button, Input, InputNumber, Modal, Space, Typography} from 'antd';
+import {Badge, Button, Input, InputNumber, Modal, Space, Tooltip, Typography} from 'antd';
+import {EyeOutlined, PayCircleOutlined} from '@ant-design/icons';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import createAxios from '@/utils/request';
 import {useRef, useState} from 'react';
@@ -176,8 +177,12 @@ export default function VolunteerPage() {
         operateWidth={180}
         requestParams={(params) => ({...params, audit_status: 1})}
         operateRender={(record, dom) => [
-          <Button key="detail" size="small" type="link" onClick={() => setDetail(record)}>查看详情</Button>,
-          <Button key="points" size="small" type="link" onClick={() => handleAdjustPoints(record)}>调积分</Button>,
+          <Tooltip title="查看详情" key="detail">
+            <Button type="primary" size="small" icon={<EyeOutlined />} onClick={() => setDetail(record)} />
+          </Tooltip>,
+          <Tooltip title="调积分" key="points">
+            <Button type="primary" size="small" icon={<PayCircleOutlined />} onClick={() => handleAdjustPoints(record)} />
+          </Tooltip>,
           dom.del,
         ]}
       />
