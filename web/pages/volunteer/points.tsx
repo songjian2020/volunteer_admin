@@ -1,7 +1,16 @@
+import AuthButton from '@/components/AuthButton';
 import XinTable from '@/components/XinTable';
-import {Typography} from 'antd';
-import type {XinTableColumn} from '@/components/XinTable/typings';
+import {PayCircleOutlined} from '@ant-design/icons';
+import {Button, Tag, Typography} from 'antd';
+import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
 import dayjs from 'dayjs';
+import {useRef, useState} from 'react';
+import AdjustPointsDrawer from './components/AdjustPointsDrawer';
+import {
+  getPointsLogTypeLabel,
+  getPointsLogTypeTagColor,
+  POINTS_LOG_TYPE_FILTER_OPTIONS,
+} from './constants/pointsLogType';
 
 const {Title, Text} = Typography;
 
@@ -16,13 +25,10 @@ interface IPointsLog {
   volunteer?: {name: string; phone: string};
 }
 
-const typeOptions = [
-  {label: '活动服务', value: 'activity'},
-  {label: '积分兑换', value: 'exchange'},
-  {label: '管理员调整', value: 'manual'},
-];
-
 export default function PointsPage() {
+  const tableRef = useRef<XinTableInstance<IPointsLog>>(null);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+
   const columns: XinTableColumn<IPointsLog>[] = [
     {title: 'ID', dataIndex: 'id', width: 70, hideInSearch: true},
     {title: '志愿者', dataIndex: 'volunteer_name', hideInTable: true, hideInForm: true},
@@ -33,11 +39,22 @@ export default function PointsPage() {
       title: '类型',
       dataIndex: 'type',
       valueType: 'select',
-      fieldProps: {options: typeOptions, placeholder: '请选择类型', allowClear: true},
-      render: (_: string, record) => record.type_text || typeOptions.find((o) => o.value === record.type)?.label || record.type || '-',
+      fieldProps: {options: POINTS_LOG_TYPE_FILTER_OPTIONS, placeholder: '请选择类型', allowClear: true},
+      render: (_: string, record) => (
+        <Tag color={getPointsLogTypeTagColor(record.type)}>
+          {record.type_text || getPointsLogTypeLabel(record.type)}
+        </Tag>
+      ),
     },
     {title: '原因', dataIndex: 'reason', hideInSearch: true},
-    {title: '积分', dataIndex: 'points', hideInSearch: true},
+    {
+      title: '积分',
+      dataIndex: 'points',
+      hideInSearch: true,
+      render: (value: number) => (
+        <Text type={value >= 0 ? 'success' : 'danger'}>{value >= 0 ? `+${value}` : value}</Text>
+      ),
+    },
     {
       title: '时间',
       dataIndex: 'created_at',
@@ -55,6 +72,7 @@ export default function PointsPage() {
     <>
       <div className="mb-5"><Title level={3}>积分记录</Title><Text type="secondary">查看志愿者积分变动明细</Text></div>
       <XinTable<IPointsLog>
+        tableRef={tableRef}
         api="/volunteer/points"
         columns={columns}
         rowKey="id"
@@ -63,6 +81,19 @@ export default function PointsPage() {
         editShow={false}
         deleteShow={false}
         keywordSearchShow={false}
+        actionBarRender={(dom) => [
+          <AuthButton auth="volunteer.volunteer.points" key="adjust">
+            <Button type="primary" icon={<PayCircleOutlined />} onClick={() => setAdjustOpen(true)}>
+              手动调整积分
+            </Button>
+          </AuthButton>,
+          dom.search,
+        ]}
+      />
+      <AdjustPointsDrawer
+        open={adjustOpen}
+        onClose={() => setAdjustOpen(false)}
+        onSuccess={() => void tableRef.current?.reload()}
       />
     </>
   );

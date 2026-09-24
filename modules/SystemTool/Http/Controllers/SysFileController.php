@@ -74,6 +74,8 @@ class SysFileController extends BaseController
                 10,
                 Auth::id()
             );
+        } catch (\App\Exceptions\HttpResponseException $e) {
+            return response()->json($e->toArray());
         } catch (\Throwable $e) {
             $msg = $e->getMessage();
             if (str_contains($msg, 'finfo') || str_contains($msg, 'MIME')) {

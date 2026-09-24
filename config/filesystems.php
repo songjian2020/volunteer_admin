@@ -45,7 +45,13 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'throw' => false,
+            'throw' => true,
+            // 阿里云 OSS 等 S3 兼容存储不支持 AWS SDK 默认的 aws-chunked 校验和，
+            // 否则写入内容会带分块头，读回后与原文不一致。
+            'request_checksum_calculation' => 'when_required',
+            'response_checksum_validation' => 'when_required',
+            // 不向对象写入 ACL（兼容关闭对象 ACL 的 Bucket）
+            'visibility' => 'private',
         ],
         'ftp' => [
             'driver' => 'ftp',
@@ -70,6 +76,11 @@ return [
             'privateKey' => env('SFTP_PRIVATE_KEY'),
             'passphrase' => env('SFTP_PASSPHRASE'),
             'throw' => false,
+        ],
+        'oss' => [
+            'driver' => 'oss',
+            'bucket' => env('OSS_BUCKET', ''),
+            'url' => env('OSS_BASE_URL', ''),
         ],
     ],
 

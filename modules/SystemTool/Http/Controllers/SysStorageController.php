@@ -157,26 +157,36 @@ class SysStorageController extends BaseController
     public function testConnection(): JsonResponse
     {
         $disk = request()->input('disk', 'local');
+        $testFile = 'storage_test_' . time() . '.txt';
+        $testContent = 'XinAdmin 存储测试文件 - ' . date('Y-m-d H:i:s');
+
+        config(["filesystems.disks.{$disk}.throw" => true]);
+        Storage::purge($disk);
 
         try {
             $storage = Storage::disk($disk);
-            $testFile = 'storage_test_' . time() . '.txt';
-            $testContent = 'XinAdmin 存储测试文件 - ' . date('Y-m-d H:i:s');
 
-            // 测试写入
-            $storage->put($testFile, $testContent);
+            if ($storage->put($testFile, $testContent) === false) {
+                return $this->error('写入测试失败');
+            }
 
-            // 测试读取
             $readContent = $storage->get($testFile);
+            if (! is_string($readContent)) {
+                return $this->error('读取测试失败：无法读取刚写入的文件');
+            }
             if ($readContent !== $testContent) {
                 return $this->error('读取测试失败：内容不匹配');
             }
 
-            // 测试删除
             $storage->delete($testFile);
 
             return $this->success('存储连接测试成功');
         } catch (\Throwable $e) {
+            try {
+                Storage::disk($disk)->delete($testFile);
+            } catch (\Throwable) {
+            }
+
             return $this->error('连接测试失败: ' . $e->getMessage());
         }
     }

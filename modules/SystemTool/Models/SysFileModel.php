@@ -71,6 +71,12 @@ class SysFileModel extends Model
                 try {
                     // 图片类型：直接返回图片URL作为预览
                     if ((int) ($data['file_type'] ?? 0) === FileType::IMAGE->value) {
+                        if (($data['disk'] ?? 'local') === 'oss') {
+                            return oss_optimized_url(
+                                oss_public_url((string) ($data['file_path'] ?? '')),
+                                'list'
+                            );
+                        }
                         if (($data['disk'] ?? 'local') === 'local') {
                             return public_storage_url((string) ($data['file_path'] ?? ''));
                         }
@@ -99,6 +105,9 @@ class SysFileModel extends Model
         return new Attribute(
             get: function ($value, array $data) {
                 try {
+                    if (($data['disk'] ?? 'local') === 'oss') {
+                        return oss_public_url((string) ($data['file_path'] ?? ''));
+                    }
                     if (($data['disk'] ?? 'local') === 'local') {
                         return public_storage_url((string) ($data['file_path'] ?? ''));
                     }

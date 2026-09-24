@@ -8,8 +8,10 @@ use Modules\AnnoRoute\Attribute\GetRoute;
 use Modules\AnnoRoute\Attribute\PostRoute;
 use Modules\AnnoRoute\Attribute\RequestAttribute;
 use Modules\Common\Http\Controllers\BaseController;
+use Modules\Common\Services\OssUploadService;
 use Modules\Volunteer\Http\Middleware\MiniProgramAuthMiddleware;
 use Modules\Volunteer\Models\VolActivitySignupModel;
+use Modules\Volunteer\Enum\PointsLogType;
 use Modules\Volunteer\Models\VolPointsLogModel;
 use Modules\Volunteer\Models\VolVolunteerModel;
 use Modules\Volunteer\Services\VolunteerConfigService;
@@ -82,11 +84,16 @@ class VolunteerController extends BaseController
         }
 
         $ext = $this->detectImageExt($binary);
-        $rel = 'avatar/' . date('Ymd') . '/' . uniqid('av_', true) . '.' . $ext;
 
         try {
-            \Illuminate\Support\Facades\Storage::disk('local')->put($rel, $binary);
-            $url = $this->normalizeAvatarUrl(public_storage_url($rel));
+            if (OssUploadService::isConfigured()) {
+                $uploaded = OssUploadService::uploadBinary($binary, $ext, 'avatar');
+                $url = $this->normalizeAvatarUrl($uploaded['file_url']);
+            } else {
+                $rel = 'avatar/' . date('Ymd') . '/' . uniqid('av_', true) . '.' . $ext;
+                \Illuminate\Support\Facades\Storage::disk('local')->put($rel, $binary);
+                $url = $this->normalizeAvatarUrl(public_storage_url($rel));
+            }
             if ($url === '') {
                 return $this->error('头像保存失败');
             }
@@ -276,11 +283,19 @@ class VolunteerController extends BaseController
             return $this->error('请先注册成为志愿者');
         }
 
-        $pageSize = (int) ($request->input('pageSize', 20));
-        $logs = VolPointsLogModel::where('volunteer_id', $volunteer->id)
-            ->orderByDesc('id')
-            ->paginate($pageSize)
-            ->toArray();
+        $pageSize = (int) ($request->input('pageSize', 50));
+        $type = trim((string) $request->input('type', ''));
+        $query = VolPointsLogModel::where('volunteer_id', $volunteer->id);
+        if ($type !== '' && $type !== 'all' && PointsLogType::isValid($type)) {
+            $query->where('type', $type);
+        }
+        $paginator = $query->orderByDesc('id')->paginate($pageSize);
+        $logs = $paginator->toArray();
+        $logs['data'] = array_map(static function (array $row) {
+            $row['type_text'] = PointsLogType::labelOf((string) ($row['type'] ?? ''));
+
+            return $row;
+        }, $logs['data'] ?? []);
 
         return $this->success([
             'total_points' => $volunteer->total_points,

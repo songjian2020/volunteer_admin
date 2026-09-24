@@ -1,4 +1,6 @@
-import {Badge, Button, Descriptions, Modal} from 'antd';
+import AuthButton from '@/components/AuthButton';
+import {Badge, Button, Descriptions, Modal, Space} from 'antd';
+import {PayCircleOutlined} from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 export interface VolunteerDetailRecord {
@@ -46,15 +48,27 @@ interface Props {
   open: boolean;
   record: VolunteerDetailRecord | null;
   onClose: () => void;
+  onAdjustPoints?: (record: VolunteerDetailRecord) => void;
 }
 
-export default function VolunteerDetailModal({open, record, onClose}: Props) {
+export default function VolunteerDetailModal({open, record, onClose, onAdjustPoints}: Props) {
   return (
     <Modal
       title="志愿者详情"
       open={open}
       onCancel={onClose}
-      footer={<Button type="primary" onClick={onClose}>关闭</Button>}
+      footer={
+        <Space>
+          {onAdjustPoints && record && (
+            <AuthButton auth="volunteer.volunteer.points">
+              <Button icon={<PayCircleOutlined />} onClick={() => onAdjustPoints(record)}>
+                调整积分
+              </Button>
+            </AuthButton>
+          )}
+          <Button type="primary" onClick={onClose}>关闭</Button>
+        </Space>
+      }
       width={720}
       destroyOnHidden
     >

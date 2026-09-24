@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Upload, message, Button, Space, Select, Input, Card } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { UploadFile, UploadProps } from 'antd';
-import { resolveUploadedFileUrl } from '@/utils/uploadUrl';
+import { extractUploadFileUrl, resolveUploadedFileUrl } from '@/utils/uploadUrl';
 
 export interface UrlImageUploadProps {
   value?: string | string[];
@@ -27,8 +27,13 @@ const UrlImageUpload: React.FC<UrlImageUploadProps> = ({
 }) => {
   const uploadMaxCount = maxCount || (mode === 'single' ? 1 : 9);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const uploadingUidsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    // 上传进行中时不要用空 value 清空列表，否则会丢掉进行中的文件导致表单拿不到 URL
+    if (uploadingUidsRef.current.size > 0) {
+      return;
+    }
     if (!value || (Array.isArray(value) && value.length === 0)) {
       setFileList([]);
       return;
@@ -57,7 +62,7 @@ const UrlImageUpload: React.FC<UrlImageUploadProps> = ({
   const emitChange = (list: UploadFile[]) => {
     const urls = list
       .filter((f) => f.status === 'done')
-      .map((f) => resolveUploadedFileUrl(f.url || f.response?.data) || '')
+      .map((f) => extractUploadFileUrl(f.response, f.url) || '')
       .filter(Boolean);
     if (mode === 'single') {
       onChange?.(urls[0] || '');
@@ -67,21 +72,69 @@ const UrlImageUpload: React.FC<UrlImageUploadProps> = ({
   };
 
   const handleChange: UploadProps['onChange'] = ({ fileList: nextList, file }) => {
+    if (file.status === 'uploading') {
+      uploadingUidsRef.current.add(file.uid);
+    } else if (file.status === 'done' || file.status === 'error' || file.status === 'removed') {
+      uploadingUidsRef.current.delete(file.uid);
+    }
+
     setFileList(nextList);
-    if (file.status !== 'done' && file.status !== 'removed' && file.status !== 'error') {
-      return;
-    }
-    if (file.status === 'done' || file.status === 'removed' || nextList.every((f) => f.status === 'done' || f.status === 'error')) {
-      const done = nextList.filter((f) => f.status === 'done').map((f) => {
-        const url = resolveUploadedFileUrl(f.response?.data || f.url);
-        return { ...f, url };
-      });
-      setFileList(done.concat(nextList.filter((f) => f.status !== 'done' && f.status !== 'removed')));
-      emitChange(done);
-    }
+
     if (file.status === 'error') {
       message.error(file.response?.msg || '上传失败');
+      const done = nextList
+        .filter((f) => f.status === 'done')
+        .map((f) => {
+          const url = extractUploadFileUrl(f.response, f.url);
+          return { ...f, url: url || f.url };
+        });
+      setFileList(done.concat(nextList.filter((f) => f.status === 'uploading' || f.status === 'error')));
+      // 仍有上传中的文件时不要清空表单值
+      if (nextList.some((f) => f.status === 'uploading')) {
+        return;
+      }
+      emitChange(done);
+      return;
     }
+
+    if (file.status !== 'done' && file.status !== 'removed') {
+      return;
+    }
+
+    // 替换上传：移除旧图时若已有新文件在传，暂不清空表单值，等 done 再写入
+    if (file.status === 'removed' && nextList.some((f) => f.status === 'uploading')) {
+      return;
+    }
+
+    if (file.response && file.response.success === false) {
+      message.error(file.response?.msg || '上传失败');
+      const withoutFailed = nextList.filter((f) => f.uid !== file.uid);
+      setFileList(withoutFailed);
+      emitChange(withoutFailed.filter((f) => f.status === 'done'));
+      return;
+    }
+
+    const done = nextList
+      .filter((f) => f.status === 'done')
+      .map((f) => {
+        const url = extractUploadFileUrl(f.response, f.url);
+        return { ...f, url: url || f.url };
+      });
+
+    const pending = nextList.filter((f) => f.status === 'uploading' || f.status === 'error');
+    setFileList(done.concat(pending));
+
+    const resolved = done
+      .map((f) => extractUploadFileUrl(f.response, f.url))
+      .filter(Boolean);
+
+    if (file.status === 'done' && resolved.length === 0) {
+      message.error('上传成功但未返回图片地址，请检查存储配置（如 OSS_BASE_URL）');
+      onChange?.(mode === 'single' ? '' : []);
+      return;
+    }
+
+    emitChange(done);
   };
 
   return (
@@ -111,7 +164,9 @@ const UrlImageUpload: React.FC<UrlImageUploadProps> = ({
       onRemove={(file) => {
         const next = fileList.filter((item) => item.uid !== file.uid);
         setFileList(next);
-        emitChange(next);
+        if (!next.some((f) => f.status === 'uploading')) {
+          emitChange(next);
+        }
         return true;
       }}
     >

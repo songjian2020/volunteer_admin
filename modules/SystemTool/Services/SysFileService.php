@@ -7,6 +7,7 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Modules\Common\Services\OssUploadService;
 use Modules\SystemTool\Enum\FileType;
 use Modules\SystemTool\Models\SysFileModel;
 use Modules\SystemTool\Settings\StorageSettings;
@@ -42,6 +43,9 @@ class SysFileService
         if ($disk === 's3' && !self::isS3Configured()) {
             throw new HttpResponseException(['success' => false, 'msg' => __('system.storage.s3_not_configured')]);
         }
+        if ($disk === 'oss') {
+            throw new HttpResponseException(['success' => false, 'msg' => 'OSS 磁盘不支持此文件操作，请使用 OssUploadService']);
+        }
         /** @var FilesystemAdapter */
         return Storage::disk($disk);
     }
@@ -66,12 +70,12 @@ class SysFileService
     {
         $originalName = (string) $file->getClientOriginalName();
         $fileExt = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
-        $realPath = $file->getRealPath();
-        $contents = (is_string($realPath) && is_file($realPath))
-            ? (string) file_get_contents($realPath)
-            : '';
+        $contents = $this->readUploadedContents($file);
         if ($contents === '') {
-            throw new HttpResponseException(['success' => false, 'msg' => __('system.file.upload_failed')]);
+            throw new HttpResponseException([
+                'success' => false,
+                'msg' => '读取上传文件失败（内容为空），请检查 PHP upload_tmp_dir / 文件大小限制',
+            ]);
         }
         if ($fileExt === '') {
             $fileExt = $this->extensionFromMagicBytes($contents);
@@ -81,14 +85,36 @@ class SysFileService
         }
         // 推断文件类型
         $fileType = FileType::guessFromExtension($fileExt);
-        // 获取储存路径
-        $storagePath = $this->generateStoragePath($fileExt);
         // 获取磁盘
-        $disk = StorageSettings::get('filesystems.default', 'local');
-        // 存储文件并设置可见性
-        $stored = $this->disk($disk)->put($storagePath, $contents, 'public');
-        if (!$stored) {
-            throw new HttpResponseException(['success' => false, 'msg' => __('system.file.upload_failed')]);
+        $disk = StorageSettings::get('filesystems.default', config('filesystems.default', 'local'));
+
+        $ossFileUrl = null;
+        if ($disk === 'oss') {
+            if (!OssUploadService::isConfigured()) {
+                throw new HttpResponseException(['success' => false, 'msg' => 'OSS 未配置，请检查 .env 中的 OSS_* 变量']);
+            }
+            try {
+                $uploaded = OssUploadService::uploadUploadedFile($file);
+            } catch (\Throwable $e) {
+                throw new HttpResponseException([
+                    'success' => false,
+                    'msg' => 'OSS 上传失败：' . ($e->getMessage() !== '' ? $e->getMessage() : '未知错误'),
+                ]);
+            }
+            $storagePath = $uploaded['file_path'];
+            $ossFileUrl = $uploaded['file_url'] ?? null;
+        } else {
+            $storagePath = $this->generateStoragePath($fileExt);
+            try {
+                $this->storeToDisk($disk, $storagePath, $contents, $fileExt);
+            } catch (HttpResponseException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                throw new HttpResponseException([
+                    'success' => false,
+                    'msg' => '上传失败[' . $disk . ']：' . ($e->getMessage() !== '' ? $e->getMessage() : '写入存储失败'),
+                ]);
+            }
         }
         // 保存到数据库
         $model = new SysFileModel();
@@ -102,7 +128,126 @@ class SysFileService
         $model->file_ext = $fileExt;
         $model->uploader_id = $user_id;
         $model->save();
-        return $model->toArray();
+
+        $result = $model->toArray();
+        // OSS 场景确保前端一定能拿到可入库的公网 URL（避免 accessor/配置异常导致空地址）
+        if ($disk === 'oss') {
+            $publicUrl = is_string($ossFileUrl) && $ossFileUrl !== ''
+                ? $ossFileUrl
+                : oss_public_url($storagePath);
+            if ($publicUrl === '') {
+                throw new HttpResponseException(['success' => false, 'msg' => 'OSS 上传成功但未生成访问地址，请检查 OSS_BASE_URL']);
+            }
+            $result['file_url'] = $publicUrl;
+            if (empty($result['preview_url'])) {
+                $result['preview_url'] = oss_optimized_url($publicUrl, 'list');
+            }
+        }
+
+        return $result;
+    }
+
+    /** 可靠读取上传文件内容（兼容 getRealPath 为空的环境） */
+    protected function readUploadedContents(UploadedFile $file): string
+    {
+        try {
+            $contents = $file->getContent();
+            if (is_string($contents) && $contents !== '') {
+                return $contents;
+            }
+        } catch (\Throwable) {
+        }
+
+        foreach (array_filter([$file->getRealPath(), $file->getPathname()]) as $path) {
+            if (is_string($path) && $path !== '' && is_file($path)) {
+                $contents = @file_get_contents($path);
+                if (is_string($contents) && $contents !== '') {
+                    return $contents;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * 写入对应磁盘。s3 走无 ACL 的 PutObject，兼容阿里云 OSS（常关闭对象 ACL）。
+     */
+    protected function storeToDisk(string $disk, string $storagePath, string $contents, string $extension): void
+    {
+        if ($disk === 's3') {
+            $this->storeToS3WithoutAcl($storagePath, $contents, $extension);
+
+            return;
+        }
+
+        $stored = $this->disk($disk)->put($storagePath, $contents, ['visibility' => 'public']);
+        if (!$stored) {
+            throw new \RuntimeException($this->guessPutFailureReason($disk));
+        }
+    }
+
+    protected function storeToS3WithoutAcl(string $storagePath, string $contents, string $extension): void
+    {
+        $filesystem = $this->disk('s3');
+        if (! method_exists($filesystem, 'getClient')) {
+            $stored = $filesystem->put($storagePath, $contents);
+            if (!$stored) {
+                throw new \RuntimeException($this->guessPutFailureReason('s3'));
+            }
+
+            return;
+        }
+
+        $config = config('filesystems.disks.s3', []);
+        $bucket = (string) ($config['bucket'] ?? '');
+        if ($bucket === '') {
+            throw new \RuntimeException('S3 Bucket 未配置');
+        }
+
+        $params = [
+            'Bucket' => $bucket,
+            'Key' => ltrim($storagePath, '/'),
+            'Body' => $contents,
+            'ContentType' => $this->guessMimeType($extension),
+        ];
+        // 不传 ACL，避免阿里云等关闭对象 ACL 的 Bucket 拒绝写入
+
+        $filesystem->getClient()->putObject($params);
+    }
+
+    protected function guessMimeType(string $extension): string
+    {
+        return match (strtolower($extension)) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'bmp' => 'image/bmp',
+            'svg' => 'image/svg+xml',
+            default => 'application/octet-stream',
+        };
+    }
+
+    protected function guessPutFailureReason(string $disk): string
+    {
+        if ($disk === 'local') {
+            $root = (string) config('filesystems.disks.local.root', '');
+            if ($root !== '' && !is_dir($root)) {
+                return "本地目录不存在：{$root}";
+            }
+            if ($root !== '' && !is_writable($root)) {
+                return "本地目录不可写：{$root}";
+            }
+
+            return '本地存储写入失败，请检查 public/storage 目录权限';
+        }
+
+        if ($disk === 's3') {
+            return 'S3/OSS 兼容存储写入失败，请检查密钥、Bucket、Endpoint，并确认未强制对象 ACL';
+        }
+
+        return '存储写入失败';
     }
 
     /** 不依赖 finfo，按文件头识别常见图片扩展名 */
@@ -176,8 +321,7 @@ class SysFileService
             throw new HttpResponseException(['success' => false, 'msg' => __('system.file.not_found')]);
         }
 
-        // 删除物理文件
-        $this->disk($file->disk)->delete($file->file_path);
+        $this->deletePhysicalFile($file);
 
         return (bool) $file->forceDelete();
     }
@@ -191,7 +335,7 @@ class SysFileService
         $count = 0;
 
         foreach ($files as $file) {
-            $this->disk($file->disk)->delete($file->file_path);
+            $this->deletePhysicalFile($file);
             $file->forceDelete();
             $count++;
         }
@@ -264,6 +408,10 @@ class SysFileService
             return null;
         }
 
+        if ($file->disk === 'oss') {
+            return oss_public_url($file->file_path);
+        }
+
         return $this->disk($file->disk)->url($file->file_path);
     }
 
@@ -272,6 +420,11 @@ class SysFileService
      */
     public function getUrlByPath(string $path, ?string $disk = null): string
     {
+        $disk = $disk ?? config('filesystems.default', 'local');
+        if ($disk === 'oss') {
+            return oss_public_url($path);
+        }
+
         return $this->disk($disk)->url($path);
     }
 
@@ -407,6 +560,10 @@ class SysFileService
             return false;
         }
 
+        if ($file->disk === 'oss') {
+            return OssUploadService::isConfigured();
+        }
+
         return $this->disk($file->disk)->exists($file->file_path);
     }
 
@@ -477,13 +634,23 @@ class SysFileService
         $expiredFiles = SysFileModel::onlyTrashed()->get();
         $count = 0;
         foreach ($expiredFiles as $file) {
-            $this->disk($file->disk)->delete($file->file_path);
+            $this->deletePhysicalFile($file);
             $file->forceDelete();
             $count++;
         }
         return $count;
     }
 
+    protected function deletePhysicalFile(SysFileModel $file): void
+    {
+        if ($file->disk === 'oss') {
+            OssUploadService::delete($file->file_path);
+
+            return;
+        }
+
+        $this->disk($file->disk)->delete($file->file_path);
+    }
 
     /**
      * 检查 S3 配置是否有效

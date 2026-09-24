@@ -66,7 +66,7 @@ class BannerManageController extends BaseController
             'type' => 'required|integer|in:1,2',
             'title' => 'nullable|string|max:100',
             'sub' => 'nullable|string|max:200',
-            'image_url' => 'required|string|max:500',
+            'image_url' => 'required|string|max:1000',
             'link_type' => 'nullable|string|max:20',
             'link_value' => 'nullable|string|max:255',
             'sort' => 'nullable|integer',

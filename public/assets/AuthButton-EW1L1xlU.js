@@ -1,0 +1,1 @@
+import{i as e}from"./rolldown-runtime-8BhlS34s.js";import{hr as t,t as n}from"./jsx-runtime-CHaQ0xIb.js";import{t as r}from"./user-W0nnqZ8h.js";var i=e(t(),1),a=n(),o=({auth:e,children:t})=>{let n=r(e=>e.access);return(0,i.useMemo)(()=>!e||n.includes(e),[n,e])?(0,a.jsx)(a.Fragment,{children:t}):null};export{o as t};

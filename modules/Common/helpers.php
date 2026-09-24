@@ -89,6 +89,42 @@ if (! function_exists('public_storage_url')) {
     }
 }
 
+if (! function_exists('oss_public_url')) {
+    /**
+     * OSS 公开访问地址：OSS_BASE_URL + file_path
+     * 已是 http(s) 地址则原样返回（兼容历史本地 URL）
+     */
+    function oss_public_url(?string $filePath): string
+    {
+        $filePath = trim((string) $filePath);
+        if ($filePath === '') {
+            return '';
+        }
+        if (preg_match('#^https?://#i', $filePath)) {
+            return $filePath;
+        }
+
+        $baseUrl = rtrim((string) config('oss.base_url', ''), '/');
+        if ($baseUrl === '') {
+            return public_storage_url($filePath);
+        }
+
+        return $baseUrl . '/' . ltrim(str_replace('\\', '/', $filePath), '/');
+    }
+}
+
+if (! function_exists('oss_optimized_url')) {
+    /**
+     * 为 OSS 图片 URL 追加网站配置中的 x-oss-process 参数
+     *
+     * @param  string  $scene  list=列表缩略图，detail=详情页
+     */
+    function oss_optimized_url(?string $url, string $scene = 'list'): string
+    {
+        return \Modules\Common\Services\OssImageUrlService::optimize($url, $scene);
+    }
+}
+
 if (! function_exists('getTreeData')) {
     /**
      * 获取树形数据

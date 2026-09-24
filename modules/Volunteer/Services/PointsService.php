@@ -14,14 +14,23 @@ class PointsService
         string $reason,
         string $type = 'manual',
         string $relatedType = '',
-        int $relatedId = 0
+        int $relatedId = 0,
+        int $operatorId = 0
     ): void {
-        DB::transaction(function () use ($volunteerId, $points, $reason, $type, $relatedType, $relatedId) {
+        if ($points === 0) {
+            throw new \RuntimeException('积分不能为0');
+        }
+
+        DB::transaction(function () use ($volunteerId, $points, $reason, $type, $relatedType, $relatedId, $operatorId) {
             $volunteer = VolVolunteerModel::lockForUpdate()->find($volunteerId);
             if (!$volunteer) {
                 throw new \RuntimeException('志愿者不存在');
             }
-            $volunteer->total_points = max(0, $volunteer->total_points + $points);
+            $nextPoints = $volunteer->total_points + $points;
+            if ($nextPoints < 0) {
+                throw new \RuntimeException('积分不足，当前余额 '.$volunteer->total_points);
+            }
+            $volunteer->total_points = $nextPoints;
             $volunteer->star_level = VolVolunteerModel::calcStarLevel($volunteer->total_points);
             $volunteer->save();
 
@@ -32,6 +41,7 @@ class PointsService
                 'points' => $points,
                 'related_type' => $relatedType,
                 'related_id' => $relatedId,
+                'operator_id' => $operatorId,
             ]);
         });
     }

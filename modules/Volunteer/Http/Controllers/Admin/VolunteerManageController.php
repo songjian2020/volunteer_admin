@@ -10,6 +10,7 @@ use Modules\AnnoRoute\Attribute\PostRoute;
 use Modules\AnnoRoute\Attribute\PutRoute;
 use Modules\AnnoRoute\Attribute\RequestAttribute;
 use Modules\Common\Http\Controllers\BaseController;
+use Modules\Volunteer\Enum\PointsLogType;
 use Modules\Volunteer\Models\VolVolunteerModel;
 use Modules\Volunteer\Models\VolWxUserModel;
 use Modules\Volunteer\Services\PointsService;
@@ -104,14 +105,54 @@ class VolunteerManageController extends BaseController
         return $this->success([], $status === 1 ? '已通过' : '已拒绝');
     }
 
+    /** 下拉搜索已通过志愿者（调积分等场景） */
+    #[GetRoute(route: '/options', authorize: 'query')]
+    public function options(Request $request): JsonResponse
+    {
+        $keyword = trim((string) $request->input('keyword', ''));
+        $query = VolVolunteerModel::query()
+            ->where('audit_status', 1)
+            ->select(['id', 'name', 'phone', 'total_points']);
+        if ($keyword !== '') {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'like', '%'.$keyword.'%')
+                    ->orWhere('phone', 'like', '%'.$keyword.'%');
+            });
+        }
+        $list = $query->orderByDesc('id')->limit(20)->get();
+        return $this->success($list);
+    }
+
     #[PostRoute(route: '/{id}/points', authorize: 'points', where: ['id' => '[0-9]+'])]
     public function adjustPoints(int $id, Request $request): JsonResponse
     {
-        $points = (int) $request->input('points', 0);
-        $reason = $request->input('reason', '管理员调整积分');
-        if ($points == 0) return $this->error('积分不能为0');
+        $data = $request->validate([
+            'points' => 'required|integer|not_in:0',
+            'reason' => 'nullable|string|max:200',
+            'type' => 'required|string|in:'.implode(',', PointsLogType::manualTypeValues()),
+        ]);
+        $points = (int) $data['points'];
+        $type = $data['type'];
+        if ($type === PointsLogType::ADMIN_GRANT->value && $points < 0) {
+            return $this->error('管理员赋分请输入正数');
+        }
+        if ($type === PointsLogType::ADMIN_DEDUCT->value && $points > 0) {
+            return $this->error('管理员扣减请输入负数');
+        }
+        $reason = trim((string) ($data['reason'] ?? ''));
+        if ($reason === '') {
+            $reason = PointsLogType::labelOf($type);
+        }
         try {
-            PointsService::addPoints($id, $points, $reason, 'manual');
+            PointsService::addPoints(
+                $id,
+                $points,
+                $reason,
+                $type,
+                '',
+                0,
+                (int) auth()->id()
+            );
             return $this->success();
         } catch (\Throwable $e) {
             return $this->error($e->getMessage());

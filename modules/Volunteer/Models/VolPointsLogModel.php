@@ -4,13 +4,14 @@ namespace Modules\Volunteer\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Volunteer\Enum\PointsLogType;
 
 class VolPointsLogModel extends Model
 {
     protected $table = 'vol_points_log';
 
     protected $fillable = [
-        'volunteer_id', 'type', 'reason', 'points', 'related_type', 'related_id',
+        'volunteer_id', 'type', 'reason', 'points', 'related_type', 'related_id', 'operator_id',
     ];
 
     protected $appends = ['type_text'];
@@ -22,11 +23,6 @@ class VolPointsLogModel extends Model
 
     public function getTypeTextAttribute(): string
     {
-        return match ((string) $this->type) {
-            'activity' => '活动服务',
-            'exchange' => '积分兑换',
-            'manual' => '管理员调整',
-            default => $this->type ?: '-',
-        };
+        return PointsLogType::labelOf((string) $this->type);
     }
 }

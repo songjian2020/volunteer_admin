@@ -1,0 +1,1 @@
+import{t as e}from"./request-ENM7jZM3.js";function t(t,n,r){return e({url:t,method:`get`,params:n,...r||{}})}function n(t,n,r){return e({url:t,method:`post`,data:n,...r||{}})}function r(t,n,r){return e({url:t,method:`put`,data:n,...r||{}})}function i(t,n,r){return e({url:t,method:`delete`,params:n,...r||{}})}export{r as i,i as n,t as r,n as t};

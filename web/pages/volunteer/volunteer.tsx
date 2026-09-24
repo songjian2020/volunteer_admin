@@ -1,9 +1,9 @@
 import XinTable from '@/components/XinTable';
-import {Badge, Button, Input, InputNumber, Modal, Space, Tooltip, Typography} from 'antd';
+import {Badge, Button, Tooltip, Typography} from 'antd';
 import {EyeOutlined, PayCircleOutlined} from '@ant-design/icons';
 import type {XinTableColumn, XinTableInstance} from '@/components/XinTable/typings';
-import createAxios from '@/utils/request';
 import {useRef, useState} from 'react';
+import AdjustPointsDrawer from './components/AdjustPointsDrawer';
 import VolunteerDetailModal, {type VolunteerDetailRecord} from './components/VolunteerDetailModal';
 
 const {Title, Text} = Typography;
@@ -27,6 +27,7 @@ const genderOptions = [
 export default function VolunteerPage() {
   const tableRef = useRef<XinTableInstance<IVolunteer>>(null);
   const [detail, setDetail] = useState<IVolunteer | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<IVolunteer | null>(null);
 
   const columns: XinTableColumn<IVolunteer>[] = [
     {title: 'ID', dataIndex: 'id', width: 70, hideInForm: true},
@@ -131,33 +132,7 @@ export default function VolunteerPage() {
     },
   ];
 
-  const handleAdjustPoints = (record: IVolunteer) => {
-    let points = 0;
-    let reason = '管理员调整积分';
-    Modal.confirm({
-      title: '调整积分',
-      content: (
-        <Space direction="vertical" style={{width: '100%'}}>
-          <InputNumber placeholder="积分(正数增加，负数扣减)" style={{width: '100%'}} onChange={v => { points = Number(v || 0); }} />
-          <Input placeholder="原因" defaultValue={reason} onChange={e => { reason = e.target.value; }} />
-        </Space>
-      ),
-      onOk: () => {
-        if (!points) {
-          window.$message?.warning('积分不能为0');
-          return Promise.reject();
-        }
-        return createAxios({
-          url: `/volunteer/volunteer/${record.id}/points`,
-          method: 'post',
-          data: {points, reason},
-        }).then(() => {
-          window.$message?.success('操作成功');
-          void tableRef.current?.reload();
-        });
-      },
-    });
-  };
+  const openAdjustPoints = (record: IVolunteer) => setAdjustTarget(record);
 
   return (
     <>
@@ -181,12 +156,26 @@ export default function VolunteerPage() {
             <Button type="primary" size="small" icon={<EyeOutlined />} onClick={() => setDetail(record)} />
           </Tooltip>,
           <Tooltip title="调积分" key="points">
-            <Button type="primary" size="small" icon={<PayCircleOutlined />} onClick={() => handleAdjustPoints(record)} />
+            <Button type="primary" size="small" icon={<PayCircleOutlined />} onClick={() => openAdjustPoints(record)} />
           </Tooltip>,
           dom.del,
         ]}
       />
-      <VolunteerDetailModal open={!!detail} record={detail} onClose={() => setDetail(null)} />
+      <VolunteerDetailModal
+        open={!!detail}
+        record={detail}
+        onClose={() => setDetail(null)}
+        onAdjustPoints={(record) => {
+          setDetail(null);
+          openAdjustPoints(record as IVolunteer);
+        }}
+      />
+      <AdjustPointsDrawer
+        open={!!adjustTarget}
+        volunteer={adjustTarget}
+        onClose={() => setAdjustTarget(null)}
+        onSuccess={() => void tableRef.current?.reload()}
+      />
     </>
   );
 }
