@@ -3,9 +3,7 @@
 namespace Modules\SystemTool\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Laravel\Boost\Boost;
 use Modules\AnnoRoute\AnnoRoute;
-use Modules\SystemTool\Ai\Boots\Reasonix;
 use Modules\SystemTool\Services\SysSiteConfigService;
 
 class SystemToolServiceProvider extends ServiceProvider
@@ -24,9 +22,10 @@ class SystemToolServiceProvider extends ServiceProvider
      */
     public function boot(AnnoRoute $annoRoute): void
     {
-        // laravel/boost 仅在 require-dev，生产 --no-dev 时不存在
-        if (class_exists(Boost::class)) {
-            Boost::registerAgent('reasonix', Reasonix::class);
+        // laravel/boost 仅在 require-dev；生产 --no-dev 时不存在，避免硬引用导致整站 500
+        $boostClass = 'Laravel\\Boost\\Boost';
+        if (class_exists($boostClass)) {
+            $boostClass::registerAgent('reasonix', \Modules\SystemTool\Ai\Boots\Reasonix::class);
         }
 
         // 注册路由
